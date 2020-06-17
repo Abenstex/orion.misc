@@ -1,0 +1,89 @@
+title = "ORION.Misc Config"
+ [database]
+     host= "rengstlcloud.spdns.de"
+     port= 5432
+     user= "orion"
+     password= "orion"
+     dbname= "orion"
+     maxIdleConnections=10
+     maxOpenConnections=10
+
+   [couchdb]
+     host = "192.168.2.43"
+     user = "orion"
+     password = "orion"
+     database = "orion_requests"
+     databaseLogging = "orion_log"
+     port = 5984
+
+   [logging]
+     logDirectory="/home/chrisu/orion/orion.misc/logs"
+     useLocalTime = true
+     maxFileAge = 3
+     maxBackups = 3
+     maxFileSize = 2
+     defaultLogLevel = "debug"
+
+   [messagebus]
+     host="tcp://192.168.2.43"
+     port= 1883
+     autoReconnect= true
+     connectRetry= true
+     connectRetryInterval= 10
+     connectionTimeout= 0
+     path="/mqtt"
+     baseTopic="orion/server/misc/request/#"
+     baseErrorTopic="orion/server/misc/error"
+     replyQos = 0
+     requestQos = 1
+     publishEventQos = 0
+
+   [general]
+     # The heartbeat interval in seconds
+     heartBeatInterval=10
+     applicationId= 99
+     useCache=true
+     # The expiration duration of JWTs in minutes
+     jwtExpirationDuration=10080
+     # The default timeout; will be converted into ms
+     timeout=15000
+     # Are multiple logins per user allowed(true) or not
+     allowMultipleLogin=true
+
+   [http]
+     serveHttpRequests=true
+     port=8083
+     registrationURL="http://192.168.2.43:9090/orion/server/core/request/service/register"
+     unregistrationURL="http://192.168.2.43:9090/orion/server/core/request/service/unregister"
+     addMetricsUrl="http://192.168.2.43:9090/orion/server/core/request/metrics/add"
+
+   [history]
+     LoginAction = true
+     SavePermissionsAction = true
+     DeletePermissionAction = true
+     SaveProfilesAction = true
+     DeleteProfileAction = true
+     GetPermissionsAction = true
+     SaveUsersAction = true
+     DeleteUserAction = true
+
+   [metrics]
+     SavePermissionsAction.monitor = true
+     SavePermissionsAction.maxSize = 15
+     SaveProfilesAction.monitor = true
+     SaveProfilesAction.maxSize = 20
+     GetPermissionsAction.monitor = true
+     GetPermissionsAction.maxSize = 20
+     DeletePermissionAction.monitor = true
+     DeletePermissionAction.maxSize = 20
+     DeleteProfileAction.monitor = true
+     DeleteProfileAction.maxSize = 20
+     LoginAction.monitor = true
+     LoginAction.maxSize = 15
+     GetProfilesAction.monitor = true
+     GetProfilesAction.maxSize = 15
+     GetUsersAction.monitor = true
+     GetUsersAction.maxSize = 15
+     SaveUsersAction.monitor = true
+     SaveUsersAction.maxSize = 15
+

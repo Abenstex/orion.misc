@@ -56,7 +56,7 @@ func (app *MiscApp) Init(configPath string) (utils.Environment, error) {
 		AppVersion:        ApplicationVersion,
 		AppInstance:       viper.GetInt("general.applicationId"),
 		StartTime:         startTime,
-		Description:       dataStructures.JsonNullString{NullString: sql.NullString{"ORION Fab Management Module", true}},
+		Description:       dataStructures.JsonNullString{NullString: sql.NullString{"ORION Misc Server Module", true}},
 		BaseBusTopic:      dataStructures.JsonNullString{NullString: sql.NullString{String: topic, Valid: true}},
 		BaseErrorTopic:    dataStructures.JsonNullString{NullString: sql.NullString{String: errorTopic, Valid: true}},
 		ActionInformation: info,
