@@ -68,22 +68,7 @@ title = "ORION.Misc Config"
      DeleteUserAction = true
 
    [metrics]
-     SavePermissionsAction.monitor = true
-     SavePermissionsAction.maxSize = 15
-     SaveProfilesAction.monitor = true
-     SaveProfilesAction.maxSize = 20
-     GetPermissionsAction.monitor = true
-     GetPermissionsAction.maxSize = 20
-     DeletePermissionAction.monitor = true
-     DeletePermissionAction.maxSize = 20
-     DeleteProfileAction.monitor = true
-     DeleteProfileAction.maxSize = 20
-     LoginAction.monitor = true
-     LoginAction.maxSize = 15
-     GetProfilesAction.monitor = true
-     GetProfilesAction.maxSize = 15
-     GetUsersAction.monitor = true
-     GetUsersAction.maxSize = 15
-     SaveUsersAction.monitor = true
-     SaveUsersAction.maxSize = 15
+     [metrics.SaveStatesAction]
+             monitor = true
+             maxSize = 5
 
