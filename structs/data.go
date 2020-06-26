@@ -8,4 +8,11 @@ type State struct {
 	ObjectAvailable bool             `json:"objectAvailable"`
 	Substate        bool             `json:"substate"`
 	DefaultState    bool             `json:"defaultState"`
+	Substates       []int64          `json:"subStates"`
+}
+
+type StateTransitionRule struct {
+	Info      structs.BaseInfo `json:"info"`
+	FromState int64            `json:"fromState"`
+	ToStates  []int64          `json:"toStates"`
 }

@@ -40,7 +40,10 @@ func (action DeleteStateAction) SendEvents(request micro.IRequest) {
 	if !delRequest.Header.WasExecutedSuccessfully {
 		logging.GetLogger("DeleteStateAction",
 			action.GetBaseAction().Environment,
-			false).Warn("Events won't be sent because the request was not successfully executed")
+			true).Warn("RequestFailedEvent will be sent because the request was not successfully executed")
+		blerghEvent := structs.NewRequestFailedEvent(delRequest, action.ProvideInformation(), action.baseAction.ID.String(), "")
+		blerghEvent.Send(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.publishEventQos")),
+			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
 	event := structs.DeletedEvent{

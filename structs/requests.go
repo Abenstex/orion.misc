@@ -63,3 +63,30 @@ func (request *GetStatesRequest) HandleResult(reply micro.IReply) micro.IRequest
 func (request GetStatesRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
+
+type SaveStateTransitionRulesRequest struct {
+	Header                      micro.RequestHeader   `json:"header"`
+	UpdatedStateTransitionRules []StateTransitionRule `json:"updatedStateTransitionRules"`
+}
+
+func (request SaveStateTransitionRulesRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
+
+func (request *SaveStateTransitionRulesRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request SaveStateTransitionRulesRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}

@@ -3,6 +3,8 @@ package actions
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"laniakea/dataStructures"
 	"laniakea/logging"
@@ -41,7 +43,10 @@ func (action SaveStatesAction) SendEvents(request micro.IRequest) {
 	if !saveRequest.Header.WasExecutedSuccessfully {
 		logging.GetLogger("SaveStatesAction",
 			action.GetBaseAction().Environment,
-			true).Warn("Events won't be sent because the request was not successfully executed")
+			true).Warn("RequestFailedEvent will be sent because the request was not successfully executed")
+		blerghEvent := structs2.NewRequestFailedEvent(saveRequest, action.ProvideInformation(), action.baseAction.ID.String(), "")
+		blerghEvent.Send(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.publishEventQos")),
+			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
 	ids := make([]int64, 0, len(saveRequest.UpdatedStates))
@@ -51,7 +56,7 @@ func (action SaveStatesAction) SendEvents(request micro.IRequest) {
 	event := structs.SavedStatesEvent{
 		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
 		States:     action.savedStates,
-		ObjectType: "RECIPE",
+		ObjectType: "STATE",
 	}
 
 	json, err := event.ToJsonString()
@@ -161,11 +166,54 @@ func (action *SaveStatesAction) saveStates(updatedStates []structs.State, origin
 				return err
 			}
 		}
-
+		var origProfile = action.getOriginalState(state.Info.Id, originalStates)
+		err = action.saveReferences(txn, state.Info.Id, state.Substates, origProfile.Substates, user)
+		if err != nil {
+			txn.Rollback()
+			return err
+		}
 		action.savedStates[idx] = state
 	}
 
 	return txn.Commit()
+
+	return nil
+}
+
+func (action *SaveStatesAction) getOriginalState(objectId int64, originalProfiles []structs.State) structs.State {
+	if objectId == -1 || originalProfiles == nil || len(originalProfiles) == 0 {
+		return structs.State{}
+	}
+	for _, profile := range originalProfiles {
+		if objectId == profile.Info.Id {
+			return profile
+		}
+	}
+
+	return structs.State{}
+}
+
+func (action SaveStatesAction) saveReferences(txn *sql.Tx, stateId int64, updatedStates []int64, originalStates []int64, user string) error {
+	compareResult := dataStructures.CompareInt64Slices(updatedStates, originalStates, true)
+	// NotInSlice1 : IDs NICHT in updatedIDs aber in origIds -> delete
+	// NotInSlice2 : IDs in updatedIDs aber NICHT in origIds -> insert
+	deleteReferenceSql := "DELETE FROM ref_states_substates WHERE state_id=$1 AND substate_id = ANY($2::bigint[]) "
+
+	if len(compareResult.NotInSlice1) > 0 {
+		logging.GetLogger(action.ProvideInformation().Name, action.GetBaseAction().Environment, false).
+			WithFields(logrus.Fields{"stateId": stateId}).Debug("Deleting updatedSubstates references for state")
+		err := utils2.ExecuteQueryWithTransaction(txn, deleteReferenceSql, stateId, pq.Array(compareResult.NotInSlice1))
+		if err != nil {
+			return err
+		}
+	}
+	columns := []string{"state_id", "substate_id", "action_by"}
+	for _, refId := range compareResult.NotInSlice2 {
+		err := utils2.ExecuteInsertWithTransaction(txn, "ref_states_substates", columns, stateId, refId, user)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
