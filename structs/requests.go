@@ -119,3 +119,33 @@ func (request DefineAttributeRequest) ToString() (string, error) {
 
 	return string(byteWurst), err
 }
+
+type GetAttributeDefinitionsRequest struct {
+	Header      micro.RequestHeader `json:"header"`
+	WhereClause *string             `json:"whereClause"`
+}
+
+func (request GetAttributeDefinitionsRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+	if err != nil {
+		fmt.Println("Error in request ToString" + err.Error())
+	}
+
+	return string(byteWurst), err
+}
+
+func (request *GetAttributeDefinitionsRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request GetAttributeDefinitionsRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}

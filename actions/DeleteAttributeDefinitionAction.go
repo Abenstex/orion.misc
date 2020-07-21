@@ -17,14 +17,14 @@ import (
 	"time"
 )
 
-type DeleteStateAction struct {
+type DeleteAttributeDefinitionAction struct {
 	baseAction    micro.BaseAction
 	MetricsStore  *utils.MetricsStore
 	deleteRequest structs.DeleteRequest
 	objectName    string
 }
 
-func (action *DeleteStateAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
+func (action *DeleteAttributeDefinitionAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
 	err := json.Unmarshal(request, &action.deleteRequest)
 	if err != nil {
 		return micro.NewException(structs.UnmarshalError, err)
@@ -41,34 +41,34 @@ func (action *DeleteStateAction) BeforeAction(ctx context.Context, request []byt
 	return nil
 }
 
-func (action *DeleteStateAction) BeforeActionAsync(ctx context.Context, request []byte) {
+func (action *DeleteAttributeDefinitionAction) BeforeActionAsync(ctx context.Context, request []byte) {
 
 }
 
-func (action *DeleteStateAction) AfterAction(ctx context.Context, reply *micro.IReply, request *micro.IRequest) *micro.Exception {
+func (action *DeleteAttributeDefinitionAction) AfterAction(ctx context.Context, reply *micro.IReply, request *micro.IRequest) *micro.Exception {
 	return nil
 }
 
-func (action *DeleteStateAction) AfterActionAsync(ctx context.Context, reply micro.IReply, request micro.IRequest) {
+func (action *DeleteAttributeDefinitionAction) AfterActionAsync(ctx context.Context, reply micro.IReply, request micro.IRequest) {
 
 }
 
-func (action *DeleteStateAction) SetHttpRequest(request *http.Request) {
+func (action *DeleteAttributeDefinitionAction) SetHttpRequest(request *http.Request) {
 	action.baseAction.Request = request
 }
 
-func (action DeleteStateAction) GetBaseAction() micro.BaseAction {
+func (action DeleteAttributeDefinitionAction) GetBaseAction() micro.BaseAction {
 	return action.baseAction
 }
 
-func (action *DeleteStateAction) InitBaseAction(baseAction micro.BaseAction) {
+func (action *DeleteAttributeDefinitionAction) InitBaseAction(baseAction micro.BaseAction) {
 	action.baseAction = baseAction
 }
 
-func (action DeleteStateAction) SendEvents(request micro.IRequest) {
+func (action DeleteAttributeDefinitionAction) SendEvents(request micro.IRequest) {
 	delRequest := request.(*structs.DeleteRequest)
 	if !delRequest.Header.WasExecutedSuccessfully {
-		logging.GetLogger("DeleteStateAction",
+		logging.GetLogger("DeleteAttributeDefinitionAction",
 			action.GetBaseAction().Environment,
 			true).Warn("RequestFailedEvent will be sent because the request was not successfully executed")
 		blerghEvent := structs.NewRequestFailedEvent(delRequest, action.ProvideInformation(), action.baseAction.ID.String(), "")
@@ -79,29 +79,29 @@ func (action DeleteStateAction) SendEvents(request micro.IRequest) {
 	event := structs.DeletedEvent{
 		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
 		ObjectId:   delRequest.ObjectId,
-		ObjectType: "STATE",
+		ObjectType: "ATTRIBUTE",
 		ObjectName: action.objectName,
 	}
 
 	json, err := event.ToJsonString()
 	if err != nil {
-		logging.GetLogger("DeleteStateAction", action.GetBaseAction().Environment, false).WithError(err).Error("Could not send events")
+		logging.GetLogger("DeleteAttributeDefinitionAction", action.GetBaseAction().Environment, false).WithError(err).Error("Could not send events")
 
 		return
 	}
 	mqtt.Publish(action.ProvideInformation().EventTopic.String, json, byte(viper.GetInt("messageBus.publishEventQos")), utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 }
 
-func (action DeleteStateAction) ProvideInformation() micro.ActionInformation {
-	var reply = "orion/server/misc/reply/state/delete"
-	var error = "orion/server/misc/error/state/delete"
-	var event = "orion/server/misc/event/state/delete"
+func (action DeleteAttributeDefinitionAction) ProvideInformation() micro.ActionInformation {
+	var reply = "orion/server/misc/reply/attributedefinition/delete"
+	var error = "orion/server/misc/error/attributedefinition/delete"
+	var event = "orion/server/misc/event/attributedefinition/delete"
 	var requestSample = dataStructures.StructToJsonString(structs.DeleteRequest{})
 	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
 	info := micro.ActionInformation{
-		Name:           "DeleteStateAction",
-		Description:    "Delete a state from the database",
-		RequestPath:    "orion/server/misc/request/state/delete",
+		Name:           "DeleteAttributeDefinitionAction",
+		Description:    "Delete an attribute definition from the database",
+		RequestPath:    "orion/server/misc/request/attributedefinition/delete",
 		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
 		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
 		Version:        1,
@@ -116,25 +116,29 @@ func (action DeleteStateAction) ProvideInformation() micro.ActionInformation {
 	return info
 }
 
-func (action *DeleteStateAction) HandleWebRequest(writer http.ResponseWriter, request *http.Request) {
+func (action *DeleteAttributeDefinitionAction) HandleWebRequest(writer http.ResponseWriter, request *http.Request) {
 	action.SetHttpRequest(request)
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action *DeleteStateAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
+func (action *DeleteAttributeDefinitionAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
 	env := action.GetBaseAction().Environment
 	err := json.Unmarshal(request, &action.deleteRequest)
 	if err != nil {
-		return structs.NewErrorReplyHeaderWithErr(err,
+		return structs.NewErrorReplyHeaderWithException(micro.NewException(structs.UnmarshalError, err),
 			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
 	}
 
-	err = utils.DeleteObjectById(env, "states", action.deleteRequest.ObjectId, "DeleteStateAction")
+	err = utils.DeleteObjectById(env, "attributes", action.deleteRequest.ObjectId, "DeleteAttributeDefinitionAction")
 	if err != nil {
-		return structs.NewErrorReplyHeaderWithErr(err,
+		logging.GetLogger("DeleteAttributeDefinitionAction", action.baseAction.Environment, true).
+			WithError(err).
+			Error("object with id %v could not be deleted from the database", action.deleteRequest.ObjectId)
+
+		return structs.NewErrorReplyHeaderWithException(micro.NewException(structs.DatabaseError, err),
 			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
 	}
 
@@ -144,11 +148,16 @@ func (action *DeleteStateAction) HeyHo(ctx context.Context, request []byte) (mic
 	return reply, &action.deleteRequest
 }
 
-func (action *DeleteStateAction) getNameBeforeDelete(objectId int64) error {
-	query := "SELECT name FROM states WHERE id=$1"
+func (action *DeleteAttributeDefinitionAction) getNameBeforeDelete(objectId int64) error {
+	query := "SELECT name FROM attributes WHERE id=$1"
 	var name string
 	row := action.GetBaseAction().Environment.Database.QueryRow(query, objectId)
 	err := row.Scan(&name)
+	if err != nil {
+		logging.GetLogger("DeleteAttributeDefinitionAction", action.baseAction.Environment, true).
+			WithError(err).
+			Error("Could not get name for object before delete (ID: %v", objectId)
+	}
 
 	action.objectName = name
 
