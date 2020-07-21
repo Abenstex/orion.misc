@@ -53,3 +53,21 @@ func (event AttributeDefinitionSavedEvent) ToJsonString() (string, error) {
 func (event AttributeDefinitionSavedEvent) GetHeader() micro.EventHeader {
 	return event.Header
 }
+
+type AttributeValueChangedEvent struct {
+	Header      micro.EventHeader `json:"eventHeader"`
+	ObjectType  string            `json:"objectType"`
+	ObjectId    uint64            `json:"objectId"`
+	AttributeId uint64            `json:"attributeId"`
+	Value       string            `json:"value"`
+}
+
+func (event AttributeValueChangedEvent) ToJsonString() (string, error) {
+	byteWurst, err := json.Marshal(event)
+
+	return string(byteWurst), err
+}
+
+func (event AttributeValueChangedEvent) GetHeader() micro.EventHeader {
+	return event.Header
+}
