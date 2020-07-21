@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"github.com/lib/pq"
@@ -23,6 +24,29 @@ type SaveStateTransitionRulesAction struct {
 	baseAction                micro.BaseAction
 	MetricsStore              *utils.MetricsStore
 	savedStateTransitionRules []structs.StateTransitionRule
+}
+
+func (action SaveStateTransitionRulesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
+	dummy := structs.SaveStateTransitionRulesRequest{}
+	err := json.Unmarshal(request, &dummy)
+	if err != nil {
+		return micro.NewException(structs2.UnmarshalError, err)
+	}
+	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+
+	return micro.NewException(structs2.RequestHeaderInvalid, err)
+}
+
+func (action SaveStateTransitionRulesAction) BeforeActionAsync(ctx context.Context, request []byte) {
+
+}
+
+func (action SaveStateTransitionRulesAction) AfterAction(ctx context.Context, reply *micro.IReply, request *micro.IRequest) *micro.Exception {
+	return nil
+}
+
+func (action SaveStateTransitionRulesAction) AfterActionAsync(ctx context.Context, reply micro.IReply, request micro.IRequest) {
+
 }
 
 func (action SaveStateTransitionRulesAction) GetBaseAction() micro.BaseAction {
@@ -72,6 +96,8 @@ func (action SaveStateTransitionRulesAction) ProvideInformation() micro.ActionIn
 	var reply = "orion/server/misc/reply/statetransitionrule/save"
 	var error = "orion/server/misc/error/statetransitionrule/save"
 	var event = "orion/server/misc/event/statetransitionrule/save"
+	var requestSample = dataStructures.StructToJsonString(micro.RegisterMicroServiceRequest{})
+	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
 	info := micro.ActionInformation{
 		Name:           "SaveStateTransitionRulesAction",
 		Description:    "Saves statetransitionrules to the database",
@@ -82,6 +108,9 @@ func (action SaveStateTransitionRulesAction) ProvideInformation() micro.ActionIn
 		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.GetBaseAction().ID.String(), Valid: true}},
 		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
 		EventTopic:     dataStructures.JsonNullString{NullString: sql.NullString{String: event, Valid: true}},
+		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
+		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
+		IsScriptable:   false,
 	}
 
 	return info
@@ -92,7 +121,7 @@ func (action *SaveStateTransitionRulesAction) HandleWebRequest(writer http.Respo
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action *SaveStateTransitionRulesAction) HeyHo(request []byte) (micro.IReply, micro.IRequest) {
+func (action *SaveStateTransitionRulesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
@@ -103,13 +132,6 @@ func (action *SaveStateTransitionRulesAction) HeyHo(request []byte) (micro.IRepl
 	if err != nil {
 		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).WithError(err).Error("Could not unmarshal request")
 		return structs2.NewErrorReplyHeaderWithOrionErr(structs2.NewOrionError(structs2.UnmarshalError, err),
-			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
-	}
-
-	err = app.DefaultHandleActionRequest(request, &saveRequest.Header, action, true)
-	if err != nil {
-		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).WithError(err).Error("Request could not be handled successfully")
-		return structs2.NewErrorReplyHeaderWithOrionErr(structs2.NewOrionError(structs2.RequestHeaderInvalid, err),
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 

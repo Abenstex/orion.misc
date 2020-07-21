@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	structs "laniakea/cache"
@@ -70,33 +71,66 @@ func (app *MiscApp) Init(configPath string) (utils.Environment, error) {
 	return environment, nil
 }
 
+func (app *MiscApp) historicize(action micro.Action, receivedTime int64, requestPayload string, requestError error) {
+	if viper.GetBool("history." + action.ProvideInformation().Name) {
+		go func() {
+			success := true
+			if requestError != nil {
+				success = false
+			}
+			err := couchdb.HistoricizeRequestReplyFromString(requestPayload, success, requestError,
+				action.ProvideInformation().RequestPath, "BUS", receivedTime)
+			if err != nil {
+				logger := logging.GetLogger(ApplicationName, app.Environment, true)
+				logger.WithError(err).Error("Historicizing request to CouchDB failed")
+			}
+		}()
+	}
+}
+
 func (app *MiscApp) OnMessageReceived(client MQTT.Client, message MQTT.Message) {
 	_, ok := app.topicActions[message.Topic()]
 	receivedTime := utils.GetCurrentTimeStamp()
 	if ok {
 		action := app.topicActions[message.Topic()]
 
-		iReply, iRequest := action.HeyHo(message.Payload())
-		iRequest.HandleResult(iReply)
-		//topic, reply, ok := functionMap[message.Topic()].HeyHo(message.Payload())
-		jsonWurst, err := iReply.MarshalJSON()
+		ctx := context.TODO()
+		go action.BeforeActionAsync(ctx, message.Payload())
+		exception := action.BeforeAction(ctx, message.Payload())
+		success := true
+		requestPayload := string(message.Payload())
+		var requestError error
+		if exception != nil {
+			requestError = fmt.Errorf(exception.ErrorText)
+			success = false
 
-		if err == nil {
-			client.Publish(action.ProvideInformation().ReplyPath.String, byte(viper.GetInt("messageBus.replyQos")), false, jsonWurst)
+			client.Publish(action.ProvideInformation().ErrorReplyPath.String, 0, false, exception)
 		} else {
-			client.Publish(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.replyQos")), false, err.Error())
-		}
+			iReply, iRequest := action.HeyHo(ctx, message.Payload())
+			iRequest.HandleResult(iReply)
+			//topic, reply, ok := functionMap[message.Topic()].HeyHo(message.Payload())
+			jsonWurst, err := iReply.MarshalJSON()
 
-		if viper.GetBool("history." + action.ProvideInformation().Name) {
-			go func() {
-				err = couchdb.HistoricizeRequestReply(iRequest, action.ProvideInformation().RequestPath, "BUS", receivedTime)
-				if err != nil {
-					logger := logging.GetLogger(ApplicationName, app.Environment, false)
-					logger.WithError(err).Error("Historicizing request to CouchDB failed")
+			if err == nil {
+				client.Publish(action.ProvideInformation().ReplyPath.String, 0, false, jsonWurst)
+			} else {
+				client.Publish(action.ProvideInformation().ErrorReplyPath.String, 0, false, err.Error())
+			}
+			success = iReply.Successful()
+			requestPayload, _ = iRequest.ToString()
+			if success {
+				exception = action.AfterAction(ctx, &iReply, &iRequest)
+				if exception != nil {
+					client.Publish(action.ProvideInformation().ErrorReplyPath.String, 0, false, exception)
 				}
-			}()
+				go action.AfterActionAsync(ctx, iReply, iRequest)
+			} else {
+				requestError = fmt.Errorf(iReply.Error())
+			}
+			go action.SendEvents(iRequest)
 		}
-		go action.SendEvents(iRequest)
+		//err := app2.DefaultHandleAction(action, message.Payload(), client)
+		app.historicize(action, receivedTime, requestPayload, requestError)
 	} else {
 		errorReply := fmt.Sprintf("No handler was found for topic %s on "+
 			"application %s version %s running on %s",

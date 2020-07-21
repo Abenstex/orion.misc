@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -22,6 +23,29 @@ import (
 type GetStatesAction struct {
 	baseAction   micro.BaseAction
 	MetricsStore *utils.MetricsStore
+}
+
+func (action GetStatesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
+	dummy := structs.GetStatesRequest{}
+	err := json.Unmarshal(request, &dummy)
+	if err != nil {
+		return micro.NewException(structs2.UnmarshalError, err)
+	}
+	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+
+	return micro.NewException(structs2.RequestHeaderInvalid, err)
+}
+
+func (action GetStatesAction) BeforeActionAsync(ctx context.Context, request []byte) {
+
+}
+
+func (action GetStatesAction) AfterAction(ctx context.Context, reply *micro.IReply, request *micro.IRequest) *micro.Exception {
+	return nil
+}
+
+func (action GetStatesAction) AfterActionAsync(ctx context.Context, reply micro.IReply, request micro.IRequest) {
+
 }
 
 func (action GetStatesAction) GetBaseAction() micro.BaseAction {
@@ -47,9 +71,8 @@ const SqlGetAllStates = "SELECT id, name, description, active, (extract(epoch fr
 func (action GetStatesAction) ProvideInformation() micro.ActionInformation {
 	var reply = "orion/server/misc/reply/state/get"
 	var error = "orion/server/misc/error/state/get"
-	sampleRequest, sampleReply := action.sampleRequestReply()
-	requestJson, _ := sampleRequest.ToString()
-	replyJson, _ := sampleReply.MarshalJSON()
+	var requestSample = dataStructures.StructToJsonString(micro.RegisterMicroServiceRequest{})
+	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
 	info := micro.ActionInformation{
 		Name:           "GetStatesAction",
 		Description:    "Get states based on conditions or all if no conditions were sent in the request",
@@ -59,27 +82,12 @@ func (action GetStatesAction) ProvideInformation() micro.ActionInformation {
 		Version:        1,
 		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.baseAction.ID.String(), Valid: true}},
 		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestJson, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replyJson, Valid: true}},
+		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
+		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
+		IsScriptable:   false,
 	}
 
 	return info
-}
-
-func (action GetStatesAction) sampleRequestReply() (micro.IRequest, micro.IReply) {
-	perm1 := structs.State{Info: structs2.NewBaseInfo()}
-	perm2 := structs.State{Info: structs2.NewBaseInfo()}
-	whereClause := " id=123 "
-	request := structs.GetStatesRequest{
-		Header:      micro.SampleRequestHeader(),
-		WhereClause: &whereClause,
-	}
-	reply := structs.GetStatesReply{
-		Header: micro.SampleReplyHeader(),
-		States: []structs.State{perm1, perm2},
-	}
-
-	return &request, reply
 }
 
 func (action *GetStatesAction) HandleWebRequest(writer http.ResponseWriter, request *http.Request) {
@@ -105,7 +113,7 @@ func (action GetStatesAction) createGetStatesReply(states []structs.State) (stru
 	return reply, structs2.NewOrionError(structs2.NoDataFound, err)
 }
 
-func (action GetStatesAction) HeyHo(request []byte) (micro.IReply, micro.IRequest) {
+func (action GetStatesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
@@ -116,12 +124,7 @@ func (action GetStatesAction) HeyHo(request []byte) (micro.IReply, micro.IReques
 		return structs2.NewErrorReplyHeaderWithOrionErr(structs2.NewOrionError(structs2.UnmarshalError, err),
 			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
 	}
-	err = app.DefaultHandleActionRequest(request, &receivedRequest.Header, &action, true)
-	if err != nil {
-		orionError := structs2.NewOrionError(structs2.GeneralError, err)
-		return structs2.NewErrorReplyHeaderWithOrionErr(orionError,
-			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
-	}
+
 	reply, myErr := action.getStates(receivedRequest)
 	if myErr != nil {
 		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,

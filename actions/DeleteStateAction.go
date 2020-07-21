@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"github.com/spf13/viper"
@@ -21,6 +22,36 @@ type DeleteStateAction struct {
 	MetricsStore  *utils.MetricsStore
 	deleteRequest structs.DeleteRequest
 	objectName    string
+}
+
+func (action *DeleteStateAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
+	dummy := structs.DeleteRequest{}
+	err := json.Unmarshal(request, &dummy)
+	if err != nil {
+		return micro.NewException(structs.UnmarshalError, err)
+	}
+	err = app.DefaultHandleActionRequest(request, &dummy.Header, action, true)
+	if err != nil {
+		return micro.NewException(structs.RequestHeaderInvalid, err)
+	}
+	err = action.getNameBeforeDelete(action.deleteRequest.ObjectId)
+	if err != nil {
+		return micro.NewException(structs.DatabaseError, err)
+	}
+
+	return nil
+}
+
+func (action *DeleteStateAction) BeforeActionAsync(ctx context.Context, request []byte) {
+
+}
+
+func (action *DeleteStateAction) AfterAction(ctx context.Context, reply *micro.IReply, request *micro.IRequest) *micro.Exception {
+	return nil
+}
+
+func (action *DeleteStateAction) AfterActionAsync(ctx context.Context, reply micro.IReply, request micro.IRequest) {
+
 }
 
 func (action *DeleteStateAction) SetHttpRequest(request *http.Request) {
@@ -66,9 +97,8 @@ func (action DeleteStateAction) ProvideInformation() micro.ActionInformation {
 	var reply = "orion/server/misc/reply/state/delete"
 	var error = "orion/server/misc/error/state/delete"
 	var event = "orion/server/misc/event/state/delete"
-	sampleRequest, sampleReply := action.sampleRequestReply()
-	requestJson, _ := sampleRequest.ToString()
-	replyJson, _ := sampleReply.MarshalJSON()
+	var requestSample = dataStructures.StructToJsonString(micro.RegisterMicroServiceRequest{})
+	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
 	info := micro.ActionInformation{
 		Name:           "DeleteStateAction",
 		Description:    "Delete a state from the database",
@@ -78,9 +108,10 @@ func (action DeleteStateAction) ProvideInformation() micro.ActionInformation {
 		Version:        1,
 		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.GetBaseAction().ID.String(), Valid: true}},
 		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestJson, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replyJson, Valid: true}},
+		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
+		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
 		EventTopic:     dataStructures.JsonNullString{NullString: sql.NullString{String: event, Valid: true}},
+		IsScriptable:   false,
 	}
 
 	return info
@@ -101,7 +132,7 @@ func (action *DeleteStateAction) HandleWebRequest(writer http.ResponseWriter, re
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action *DeleteStateAction) HeyHo(request []byte) (micro.IReply, micro.IRequest) {
+func (action *DeleteStateAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
@@ -111,17 +142,7 @@ func (action *DeleteStateAction) HeyHo(request []byte) (micro.IReply, micro.IReq
 		return structs.NewErrorReplyHeaderWithErr(err,
 			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
 	}
-	err = app.DefaultHandleActionRequest(request, &action.deleteRequest.Header, action, true)
-	if err != nil {
-		return structs.NewErrorReplyHeaderWithErr(err,
-			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
-	}
 
-	err = action.getNameBeforeDelete(action.deleteRequest.ObjectId)
-	if err != nil {
-		return structs.NewErrorReplyHeaderWithOrionErr(structs.NewOrionError(structs.DatabaseError, err),
-			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
-	}
 	err = utils.DeleteObjectById(env, "states", action.deleteRequest.ObjectId, "DeleteStateAction")
 	if err != nil {
 		return structs.NewErrorReplyHeaderWithErr(err,

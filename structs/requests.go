@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"laniakea/micro"
+	"orion.commons/structs"
 )
 
 type SaveStatesRequest struct {
@@ -86,6 +87,34 @@ func (request *SaveStateTransitionRulesRequest) HandleResult(reply micro.IReply)
 }
 
 func (request SaveStateTransitionRulesRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+type DefineAttributeRequest struct {
+	Header                      micro.RequestHeader           `json:"header"`
+	UpdatedAttributeDefinitions []structs.AttributeDefinition `json:"updatedAttributeDefinitions"`
+	OriginalAttributeDefintions []structs.AttributeDefinition `json:"originalAttributeDefinition"`
+}
+
+func (request DefineAttributeRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
+
+func (request *DefineAttributeRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request DefineAttributeRequest) ToString() (string, error) {
 	byteWurst, err := json.Marshal(request)
 
 	return string(byteWurst), err
