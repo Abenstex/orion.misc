@@ -12,6 +12,10 @@ type SaveStatesRequest struct {
 	OriginalState []State             `json:"originalState"`
 }
 
+func (request *SaveStatesRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
 func (request SaveStatesRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
@@ -39,6 +43,10 @@ type GetStatesRequest struct {
 	WhereClause *string             `json:"whereClause"`
 }
 
+func (request *GetStatesRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
 func (request GetStatesRequest) ToString() (string, error) {
 	byteWurst, err := json.Marshal(request)
 
@@ -64,6 +72,10 @@ func (request GetStatesRequest) GetHeader() *micro.RequestHeader {
 type SaveStateTransitionRulesRequest struct {
 	Header                      micro.RequestHeader   `json:"header"`
 	UpdatedStateTransitionRules []StateTransitionRule `json:"updatedStateTransitionRules"`
+}
+
+func (request *SaveStateTransitionRulesRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
 }
 
 func (request SaveStateTransitionRulesRequest) GetHeader() *micro.RequestHeader {
@@ -94,6 +106,10 @@ type DefineAttributeRequest struct {
 	OriginalAttributeDefintions []structs.AttributeDefinition `json:"originalAttributeDefinition"`
 }
 
+func (request *DefineAttributeRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
 func (request DefineAttributeRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
@@ -119,6 +135,10 @@ func (request DefineAttributeRequest) ToString() (string, error) {
 type GetAttributeDefinitionsRequest struct {
 	Header      micro.RequestHeader `json:"header"`
 	WhereClause *string             `json:"whereClause"`
+}
+
+func (request *GetAttributeDefinitionsRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
 }
 
 func (request GetAttributeDefinitionsRequest) ToString() (string, error) {
@@ -149,6 +169,10 @@ type SetAttributeValueRequest struct {
 	Value       string              `json:"value"`
 	ObjectType  string              `json:"objectType"`
 	ObjectId    uint64              `json:"objectId"`
+}
+
+func (request *SetAttributeValueRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
 }
 
 func (request SetAttributeValueRequest) ToString() (string, error) {

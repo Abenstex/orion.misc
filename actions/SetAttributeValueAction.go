@@ -12,6 +12,7 @@ import (
 	utils2 "laniakea/utils"
 	"net/http"
 	"orion.commons/app"
+	"orion.commons/couchdb"
 	http2 "orion.commons/http"
 	"orion.commons/structs"
 	"orion.commons/utils"
@@ -20,32 +21,46 @@ import (
 )
 
 type SetAttributeValueAction struct {
-	baseAction   micro.BaseAction
-	MetricsStore *utils.MetricsStore
-	setRequest   structs2.SetAttributeValueRequest
+	baseAction    micro.BaseAction
+	MetricsStore  *utils.MetricsStore
+	setRequest    structs2.SetAttributeValueRequest
+	originalValue string
 }
 
-func (action SetAttributeValueAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
+func (action *SetAttributeValueAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
 	dummy := structs2.SetAttributeValueRequest{}
 	err := json.Unmarshal(request, &dummy)
 	if err != nil {
 		return micro.NewException(structs.UnmarshalError, err)
 	}
-	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+	err = app.DefaultHandleActionRequest(request, &dummy.Header, action, true)
+	if err != nil {
+		return micro.NewException(structs.RequestHeaderInvalid, err)
+	}
+	err = action.getOldValueBeforeUpdate(dummy.AttributeId, dummy.ObjectId)
 
-	return micro.NewException(structs.RequestHeaderInvalid, err)
+	return micro.NewException(structs.DatabaseError, err)
 }
 
-func (action SetAttributeValueAction) BeforeActionAsync(ctx context.Context, request []byte) {
+func (action *SetAttributeValueAction) BeforeActionAsync(ctx context.Context, request []byte) {
 
 }
 
-func (action SetAttributeValueAction) AfterAction(ctx context.Context, reply *micro.IReply, request *micro.IRequest) *micro.Exception {
+func (action *SetAttributeValueAction) AfterAction(ctx context.Context, reply *micro.IReply, request *micro.IRequest) *micro.Exception {
 	return nil
 }
 
-func (action SetAttributeValueAction) AfterActionAsync(ctx context.Context, reply micro.IReply, request micro.IRequest) {
+func (action *SetAttributeValueAction) AfterActionAsync(ctx context.Context, reply micro.IReply, request micro.IRequest) {
+	requestString, _ := action.setRequest.ToString()
 
+	// HistoricizeAttributeChange(request string, requestPath, oldValue, newValue, referencedType string, receivedTime int64)
+	err := couchdb.HistoricizeAttributeChange(requestString, action.ProvideInformation().RequestPath, action.originalValue,
+		action.setRequest.Value, action.setRequest.ObjectType, action.setRequest.AttributeId, action.setRequest.ObjectId, action.setRequest.Header.ReceivedTimeInMillis)
+	if err != nil {
+		logging.GetLogger("SetAttributeValueAction",
+			action.GetBaseAction().Environment,
+			true).WithError(err).Error("cannot historicize attribute value change")
+	}
 }
 
 func (action SetAttributeValueAction) GetBaseAction() micro.BaseAction {
@@ -152,4 +167,15 @@ func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttribut
 
 	return utils2.ExecuteQueryInTransaction(action.baseAction.Environment, query, request.AttributeId, request.Value,
 		request.ObjectType, request.ObjectId, request.Header.User, request.Value, request.Header.User)
+}
+
+func (action *SetAttributeValueAction) getOldValueBeforeUpdate(attr_id, object_id uint64) error {
+	query := "SELECT attr_value FROM ref_attributes_objects WHERE attr_id=$1 AND object_id=$2"
+	var value string
+	row := action.GetBaseAction().Environment.Database.QueryRow(query, attr_id, object_id)
+	err := row.Scan(&value)
+
+	action.originalValue = value
+
+	return err
 }

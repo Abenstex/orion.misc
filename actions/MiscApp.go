@@ -108,6 +108,9 @@ func (app *MiscApp) OnMessageReceived(client MQTT.Client, message MQTT.Message) 
 		} else {
 			iReply, iRequest := action.HeyHo(ctx, message.Payload())
 			iRequest.HandleResult(iReply)
+			header := iRequest.GetHeader()
+			header.UpdateReceivedTime(receivedTime)
+			iRequest.UpdateHeader(header)
 			//topic, reply, ok := functionMap[message.Topic()].HeyHo(message.Payload())
 			jsonWurst, err := iReply.MarshalJSON()
 

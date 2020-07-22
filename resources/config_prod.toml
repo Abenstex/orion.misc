@@ -13,6 +13,7 @@ title = "ORION.Misc Config"
      user = "orion"
      password = "orion"
      database = "orion_requests"
+     runtimeDatabase = "orion_data_changes"
      databaseLogging = "orion_log"
      port = 5984
 
@@ -58,17 +59,16 @@ title = "ORION.Misc Config"
      addMetricsUrl="http://192.168.2.43:9090/orion/server/core/request/metrics/add"
 
    [history]
-     LoginAction = true
-     SavePermissionsAction = true
-     DeletePermissionAction = true
-     SaveProfilesAction = true
-     DeleteProfileAction = true
-     GetPermissionsAction = true
-     SaveUsersAction = true
-     DeleteUserAction = true
+     SaveStatesAction = true
+     DeleteStateAction = true
+     SetAttributeValueAction = true
+     DeleteAttributeDefinitionAction = true
 
    [metrics]
      [metrics.SaveStatesAction]
              monitor = true
              maxSize = 5
+     [metrics.SetAttributeValueAction]
+             monitor = true
+             maxSize = 1
 
