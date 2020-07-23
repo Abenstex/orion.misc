@@ -23,7 +23,7 @@ import (
 
 const SqlGetAllAttributeDefinitions = "SELECT id, name, description, active, " +
 	"(extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, b.action_by, datatype, overwriteable, " +
-	"allowed_object_types, list_of_values, numeric_from, numeric_to, query " +
+	"allowed_object_types, list_of_values, numeric_from, numeric_to, query, default_value, assign_during_object_creation " +
 	"FROM attributes a left outer join cache b on a.id=b.object_id "
 
 type GetAttributeDefinitionsAction struct {
@@ -144,12 +144,12 @@ func (action GetAttributeDefinitionsAction) fillAttributeDefinitions(rows *sql.R
 		/*
 			id, name, description, active, " +
 			"(extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, b.action_by, datatype, overwriteable, " +
-			"allowed_object_types, list_of_values, numeric_from, numeric_to, query
+			"allowed_object_types, list_of_values, numeric_from, numeric_to, query, default_value, assign_during_object_creation
 		*/
 		err := rows.Scan(&attribute.Info.Id, &attribute.Info.Name, &attribute.Info.Description, &attribute.Info.Active,
 			&attribute.Info.CreatedDate, &attribute.Info.Alias, &attribute.Info.LockedBy, &attribute.DataType,
 			&attribute.Overwriteable, pq.Array(&attribute.AllowedObjectTypes), pq.Array(&attribute.ListOfValues),
-			&attribute.NumericFrom, &attribute.NumericTo, &attribute.Query)
+			&attribute.NumericFrom, &attribute.NumericTo, &attribute.Query, &attribute.DefaultValue, &attribute.AssignDuringObjectCreation)
 		if err != nil {
 			return nil, micro.NewException(structs2.DatabaseError, err)
 		}

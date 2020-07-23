@@ -148,10 +148,11 @@ func (action *DefineAttributesAction) HeyHo(ctx context.Context, request []byte)
 func (action *DefineAttributesAction) saveObjects(updatedObjects []structs.AttributeDefinition, originalObjects []structs.AttributeDefinition, user string) error {
 	insertSql := "INSERT INTO attributes (name, description, active, action_by, pretty_id, datatype, " +
 		" overwriteable, allowed_object_types, list_of_values, numeric_from, numeric_to, " +
-		" query, object_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id"
+		" query, object_type, default_value, assign_during_object_creation) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id"
 	updateSql := "UPDATE attributes SET name = $1, description = $2, active = $3, action_by = $4, " +
 		"pretty_id = $5, overwriteable = $6, allowed_object_types = $7, list_of_values = $8, " +
-		"numeric_from = $9, numeric_to = $10, query = $11, datatype = $12 WHERE id = $13 "
+		"numeric_from = $9, numeric_to = $10, query = $11, datatype = $12, default_value=$13, assign_during_object_creation = $14 WHERE id = $15 "
 	action.savedObjects = make([]structs.AttributeDefinition, len(updatedObjects), len(updatedObjects))
 
 	txn, err := action.GetBaseAction().Environment.Database.Begin()
@@ -168,7 +169,7 @@ func (action *DefineAttributesAction) saveObjects(updatedObjects []structs.Attri
 				updatedObject.Info.Description, updatedObject.Info.Active, user,
 				updatedObject.Info.Alias, updatedObject.DataType, updatedObject.Overwriteable, pq.Array(updatedObject.AllowedObjectTypes),
 				pq.Array(updatedObject.ListOfValues), updatedObject.NumericFrom, updatedObject.NumericTo,
-				updatedObject.Query, "ATTRIBUTE")
+				updatedObject.Query, "ATTRIBUTE", updatedObject.DefaultValue, updatedObject.AssignDuringObjectCreation)
 			if err != nil {
 				logging.GetLogger("DefineAttributesAction", action.GetBaseAction().Environment, false).WithError(err).Error("Could not insert user")
 				txn.Rollback()
@@ -179,7 +180,8 @@ func (action *DefineAttributesAction) saveObjects(updatedObjects []structs.Attri
 			err := laniakea.ExecuteQueryWithTransaction(txn, updateSql, updatedObject.Info.Name,
 				updatedObject.Info.Description, updatedObject.Info.Active, user, updatedObject.Info.Alias, updatedObject.Overwriteable,
 				pq.Array(updatedObject.AllowedObjectTypes), pq.Array(updatedObject.ListOfValues),
-				updatedObject.NumericFrom, updatedObject.NumericTo, updatedObject.Query, updatedObject.DataType, updatedObject.Info.Id)
+				updatedObject.NumericFrom, updatedObject.NumericTo, updatedObject.Query, updatedObject.DataType,
+				updatedObject.DefaultValue, updatedObject.AssignDuringObjectCreation, updatedObject.Info.Id)
 			if err != nil {
 				logging.GetLogger("DefineAttributesAction", action.GetBaseAction().Environment, false).WithError(err).Error("Could not update user")
 				txn.Rollback()
