@@ -164,11 +164,8 @@ func (request GetAttributeDefinitionsRequest) GetHeader() *micro.RequestHeader {
 }
 
 type SetAttributeValueRequest struct {
-	Header      micro.RequestHeader `json:"header"`
-	AttributeId uint64              `json:"attributeId"`
-	Value       string              `json:"value"`
-	ObjectType  string              `json:"objectType"`
-	ObjectId    uint64              `json:"objectId"`
+	Header     micro.RequestHeader `json:"header"`
+	Attributes []structs.Attribute `json:"attributes"`
 }
 
 func (request *SetAttributeValueRequest) UpdateHeader(header *micro.RequestHeader) {

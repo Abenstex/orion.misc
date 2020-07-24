@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"laniakea/dataStructures"
 	"laniakea/logging"
@@ -21,10 +23,10 @@ import (
 )
 
 type SetAttributeValueAction struct {
-	baseAction    micro.BaseAction
-	MetricsStore  *utils.MetricsStore
-	setRequest    structs2.SetAttributeValueRequest
-	originalValue string
+	baseAction       micro.BaseAction
+	MetricsStore     *utils.MetricsStore
+	setRequest       structs2.SetAttributeValueRequest
+	attributeChanges []structs2.AttributeChange
 }
 
 func (action *SetAttributeValueAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -37,9 +39,7 @@ func (action *SetAttributeValueAction) BeforeAction(ctx context.Context, request
 	if err != nil {
 		return micro.NewException(structs.RequestHeaderInvalid, err)
 	}
-	err = action.getOldValueBeforeUpdate(dummy.AttributeId, dummy.ObjectId)
-
-	return micro.NewException(structs.DatabaseError, err)
+	return action.getOldValueBeforeUpdate(dummy)
 }
 
 func (action *SetAttributeValueAction) BeforeActionAsync(ctx context.Context, request []byte) {
@@ -54,13 +54,18 @@ func (action *SetAttributeValueAction) AfterActionAsync(ctx context.Context, rep
 	requestString, _ := action.setRequest.ToString()
 
 	// HistoricizeAttributeChange(request string, requestPath, oldValue, newValue, referencedType string, receivedTime int64)
-	err := couchdb.HistoricizeAttributeChange(requestString, action.ProvideInformation().RequestPath, action.originalValue,
-		action.setRequest.Value, action.setRequest.ObjectType, action.setRequest.AttributeId, action.setRequest.ObjectId, action.setRequest.Header.ReceivedTimeInMillis)
-	if err != nil {
-		logging.GetLogger("SetAttributeValueAction",
-			action.GetBaseAction().Environment,
-			true).WithError(err).Error("cannot historicize attribute value change")
+	for _, change := range action.attributeChanges {
+		err := couchdb.HistoricizeAttributeChange(requestString, action.ProvideInformation().RequestPath, change.OriginalValue,
+			change.NewValue, change.ObjectType, change.AttributeId, change.ObjectId, action.setRequest.Header.ReceivedTimeInMillis)
+		if err != nil {
+			logging.GetLogger("SetAttributeValueAction",
+				action.GetBaseAction().Environment,
+				true).WithError(err).Error("cannot historicize attribute value change")
+
+			break
+		}
 	}
+
 }
 
 func (action SetAttributeValueAction) GetBaseAction() micro.BaseAction {
@@ -87,11 +92,8 @@ func (action SetAttributeValueAction) SendEvents(request micro.IRequest) {
 		return
 	}
 	event := structs2.AttributeValueChangedEvent{
-		Header:      *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
-		ObjectType:  action.setRequest.ObjectType,
-		ObjectId:    action.setRequest.ObjectId,
-		Value:       action.setRequest.Value,
-		AttributeId: action.setRequest.AttributeId,
+		Header:           *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		AttributeChanges: action.attributeChanges,
 	}
 
 	json, err := event.ToJsonString()
@@ -143,13 +145,16 @@ func (action *SetAttributeValueAction) HeyHo(ctx context.Context, request []byte
 			action.ProvideInformation().ErrorReplyPath.String), &action.setRequest
 	}
 
-	err = action.saveAttribute(action.setRequest)
-	if err != nil {
-		//fmt.Printf("Save Users error: %v\n", err)
+	exception := action.saveAttribute(action.setRequest)
+	if exception != nil {
 		logging.GetLogger("SetAttributeValueAction",
 			action.GetBaseAction().Environment,
-			true).WithError(err).Error("Data could not be saved")
-		return structs.NewErrorReplyHeaderWithOrionErr(structs.NewOrionError(structs.DatabaseError, err),
+			true).WithFields(logrus.Fields{
+			"code":  exception.ErrorCode,
+			"error": exception.ErrorText,
+		}).Error("Data could not be saved")
+
+		return structs.NewErrorReplyHeaderWithException(exception,
 			action.ProvideInformation().ErrorReplyPath.String), &action.setRequest
 	}
 
@@ -159,23 +164,58 @@ func (action *SetAttributeValueAction) HeyHo(ctx context.Context, request []byte
 	return reply, &action.setRequest
 }
 
-func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttributeValueRequest) error {
+func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttributeValueRequest) *micro.Exception {
 	query := "INSERT INTO ref_attributes_objects (attr_id, attr_value, object_type, object_id, action_by) " +
 		"VALUES ($1, $2, $3, $4, $5) " +
 		"ON CONFLICT ON CONSTRAINT ref_attributes_objects_unique_constraint " +
 		"DO UPDATE SET attr_value = $6, action_by = $7 "
 
-	return utils2.ExecuteQueryInTransaction(action.baseAction.Environment, query, request.AttributeId, request.Value,
-		request.ObjectType, request.ObjectId, request.Header.User, request.Value, request.Header.User)
+	txn, err := action.baseAction.Environment.Database.Begin()
+	if err != nil {
+		return micro.NewException(structs.DatabaseError, err)
+	}
+
+	for _, attribute := range request.Attributes {
+		err = utils2.ExecuteQueryWithTransaction(txn, query, attribute.Info.Id, attribute.Value,
+			attribute.ObjectType, attribute.ObjectId, request.Header.User, attribute.Value, request.Header.User)
+		if err != nil {
+			txn.Rollback()
+			return micro.NewException(structs.DatabaseError, err)
+		}
+	}
+	err = txn.Commit()
+
+	return micro.NewException(structs.DatabaseError, err)
 }
 
-func (action *SetAttributeValueAction) getOldValueBeforeUpdate(attr_id, object_id uint64) error {
-	query := "SELECT attr_value FROM ref_attributes_objects WHERE attr_id=$1 AND object_id=$2"
-	var value string
-	row := action.GetBaseAction().Environment.Database.QueryRow(query, attr_id, object_id)
-	err := row.Scan(&value)
+func (action *SetAttributeValueAction) getOldValueBeforeUpdate(request structs2.SetAttributeValueRequest) *micro.Exception {
+	var attrIds []int64
+	var objectIds []int64
+	newValueMap := make(map[uint64]structs.Attribute, len(request.Attributes))
+	for _, tmp := range request.Attributes {
+		attrIds = append(attrIds, tmp.Info.Id)
+		objectIds = append(objectIds, tmp.ObjectId)
+		newValueMap[uint64(tmp.Info.Id)] = tmp
+	}
+	query := "SELECT attr_value, attr_id, object_id, object_type FROM ref_attributes_objects WHERE attr_id = ANY($1::bigint[]) AND object_id = ANY($2::bigint[])"
+	rows, err := action.GetBaseAction().Environment.Database.Query(query, pq.Array(attrIds), pq.Array(objectIds))
+	if err != nil {
+		return micro.NewException(structs.DatabaseError, err)
+	}
+	defer rows.Close()
 
-	action.originalValue = value
+	var attributeChanges []structs2.AttributeChange
+	for rows.Next() {
+		var change structs2.AttributeChange
+		err := rows.Scan(&change.OriginalValue, &change.AttributeId, &change.ObjectId, &change.ObjectType)
+		if err != nil {
+			return micro.NewException(structs.DatabaseError, err)
+		}
+		change.NewValue = newValueMap[change.AttributeId].Value
+		attributeChanges = append(attributeChanges, change)
+	}
 
-	return err
+	action.attributeChanges = attributeChanges
+
+	return nil
 }

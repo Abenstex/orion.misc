@@ -55,11 +55,8 @@ func (event AttributeDefinitionSavedEvent) GetHeader() micro.EventHeader {
 }
 
 type AttributeValueChangedEvent struct {
-	Header      micro.EventHeader `json:"eventHeader"`
-	ObjectType  string            `json:"objectType"`
-	ObjectId    uint64            `json:"objectId"`
-	AttributeId uint64            `json:"attributeId"`
-	Value       string            `json:"value"`
+	Header           micro.EventHeader `json:"eventHeader"`
+	AttributeChanges []AttributeChange `json:"attributeChange"`
 }
 
 func (event AttributeValueChangedEvent) ToJsonString() (string, error) {

@@ -16,3 +16,11 @@ type StateTransitionRule struct {
 	FromState int64            `json:"fromState"`
 	ToStates  []int64          `json:"toStates"`
 }
+
+type AttributeChange struct {
+	AttributeId   uint64
+	ObjectType    string
+	ObjectId      uint64
+	OriginalValue string
+	NewValue      string
+}
