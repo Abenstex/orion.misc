@@ -172,6 +172,9 @@ func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttribut
 
 	txn, err := action.baseAction.Environment.Database.Begin()
 	if err != nil {
+		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
+			WithError(err).
+			Error("transaction could not be started")
 		return micro.NewException(structs.DatabaseError, err)
 	}
 
@@ -180,6 +183,9 @@ func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttribut
 			attribute.ObjectType, attribute.ObjectId, request.Header.User, attribute.Value, request.Header.User)
 		if err != nil {
 			txn.Rollback()
+			logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
+				WithError(err).
+				Error("values could not be saved -> rollback")
 			return micro.NewException(structs.DatabaseError, err)
 		}
 	}
@@ -200,6 +206,9 @@ func (action *SetAttributeValueAction) getOldValueBeforeUpdate(request structs2.
 	query := "SELECT attr_value, attr_id, object_id, object_type FROM ref_attributes_objects WHERE attr_id = ANY($1::bigint[]) AND object_id = ANY($2::bigint[])"
 	rows, err := action.GetBaseAction().Environment.Database.Query(query, pq.Array(attrIds), pq.Array(objectIds))
 	if err != nil {
+		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
+			WithError(err).
+			Error("original values could not be read from database")
 		return micro.NewException(structs.DatabaseError, err)
 	}
 	defer rows.Close()
@@ -209,6 +218,9 @@ func (action *SetAttributeValueAction) getOldValueBeforeUpdate(request structs2.
 		var change structs2.AttributeChange
 		err := rows.Scan(&change.OriginalValue, &change.AttributeId, &change.ObjectId, &change.ObjectType)
 		if err != nil {
+			logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
+				WithError(err).
+				Error("original values could not be read from database")
 			return micro.NewException(structs.DatabaseError, err)
 		}
 		change.NewValue = newValueMap[change.AttributeId].Value

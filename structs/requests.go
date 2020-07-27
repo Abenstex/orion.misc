@@ -193,3 +193,35 @@ func (request *SetAttributeValueRequest) HandleResult(reply micro.IReply) micro.
 func (request SetAttributeValueRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
+
+type DeleteAttributeValueRequest struct {
+	Header      micro.RequestHeader `json:"header"`
+	AttributeId uint64              `json:"attributeId"`
+	ObjectId    uint64              `json:"objectId"`
+}
+
+func (request *DeleteAttributeValueRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request DeleteAttributeValueRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *DeleteAttributeValueRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request DeleteAttributeValueRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
