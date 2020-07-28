@@ -59,3 +59,30 @@ func (reply GetAttributeDefinitionsReply) Error() string {
 func (reply GetAttributeDefinitionsReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type GetAttributeValuesReply struct {
+	Header     micro.ReplyHeader   `json:"header"`
+	Attributes []structs.Attribute `json:"attributes"`
+}
+
+func (reply GetAttributeValuesReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetAttributeValuesReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetAttributeValuesReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetAttributeValuesReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}

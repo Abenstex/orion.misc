@@ -196,7 +196,7 @@ func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttribut
 
 func (action *SetAttributeValueAction) getOldValueBeforeUpdate(request structs2.SetAttributeValueRequest) *micro.Exception {
 	var attrIds []int64
-	var objectIds []int64
+	var objectIds []uint64
 	newValueMap := make(map[uint64]structs.Attribute, len(request.Attributes))
 	for _, tmp := range request.Attributes {
 		attrIds = append(attrIds, tmp.Info.Id)

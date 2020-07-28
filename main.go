@@ -19,7 +19,7 @@ func main() {
 	flag.Parse()
 
 	app := actions.MiscApp{}
-	app.AppInfo.ActionInformation = make([]micro.ActionInformation, 10)
+	app.AppInfo.ActionInformation = make([]micro.ActionInformation, 15)
 
 	shutdown.Add(func() {
 		app.UnregisterApplication()
@@ -57,9 +57,12 @@ func main() {
 	setAttributeValueAction.InitBaseAction(baseAction)
 	deleteAttributeValueAction := actions.DeleteAttributeValueAction{MetricsStore: metricsStore}
 	deleteAttributeValueAction.InitBaseAction(baseAction)
+	getAttributeValuesAction := actions.GetAttributeValuesPerObjectAction{MetricsStore: metricsStore}
+	getAttributeValuesAction.InitBaseAction(baseAction)
 
 	actions := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
-		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction}
+		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
+		&getAttributeValuesAction}
 
 	app.StartApplication(actions)
 	err = app.RegisterApplication()

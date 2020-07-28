@@ -32,7 +32,7 @@ type GetAttributeDefinitionsAction struct {
 }
 
 func (action GetAttributeDefinitionsAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
-	dummy := structs.GetStatesRequest{}
+	dummy := structs.GetAttributeDefinitionsRequest{}
 	err := json.Unmarshal(request, &dummy)
 	if err != nil {
 		return micro.NewException(structs2.UnmarshalError, err)
