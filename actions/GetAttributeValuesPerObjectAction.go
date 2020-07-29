@@ -22,7 +22,7 @@ import (
 
 const SqlGetAttributeValues = "SELECT attr_id, attr_value, a.object_type, object_id, b.datatype, b.name, b.description, " +
 	"(extract(epoch from b.created_date)::bigint)*1000 AS created_date, " +
-	"b.active, b.pretty_id, b.id, b.overwriteable " +
+	"b.active, b.pretty_id, a.id, b.overwriteable " +
 	"FROM ref_attributes_objects a INNER JOIN attributes b ON a.attr_id = b.id " +
 	"WHERE a.object_id=$1 "
 
@@ -147,7 +147,7 @@ func (action GetAttributeValuesPerObjectAction) fillAttributeValues(rows *sql.Ro
 		/*
 			attr_id, attr_value, a.object_type, object_id, b.datatype, b.name, b.description, " +
 			"(extract(epoch from b.created_date)::bigint)*1000 AS created_date, " +
-			"b.active, b.pretty_id, b.id, b.overwriteable "
+			"b.active, b.pretty_id, a.id, b.overwriteable "
 		*/
 		err := rows.Scan(&attribute.AttributeId, &attribute.Value, &attribute.ObjectType, &attribute.ObjectId,
 			&attribute.DataType, &attribute.Info.Name, &attribute.Info.Description,

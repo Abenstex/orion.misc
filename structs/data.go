@@ -24,3 +24,9 @@ type AttributeChange struct {
 	OriginalValue string
 	NewValue      string
 }
+
+type Hierarchy struct {
+	Info       structs.BaseInfo `json:"info"`
+	Index      int              `json:"index"`
+	ObjectType string           `json:"objectType"`
+}
