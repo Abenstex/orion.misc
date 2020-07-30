@@ -257,3 +257,34 @@ func (request *GetAttributeValuesRequest) HandleResult(reply micro.IReply) micro
 func (request GetAttributeValuesRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
+
+type GetAttributeValueChangeHistoryRequest struct {
+	Header   micro.RequestHeader `json:"header"`
+	ObjectId uint64              `json:"objectId"`
+}
+
+func (request *GetAttributeValueChangeHistoryRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request GetAttributeValueChangeHistoryRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *GetAttributeValueChangeHistoryRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request GetAttributeValueChangeHistoryRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}

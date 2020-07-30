@@ -59,10 +59,12 @@ func main() {
 	deleteAttributeValueAction.InitBaseAction(baseAction)
 	getAttributeValuesAction := actions.GetAttributeValuesPerObjectAction{MetricsStore: metricsStore}
 	getAttributeValuesAction.InitBaseAction(baseAction)
+	getAttributeChangeHistoryAction := actions.GetAttributeChangeHistoryAction{MetricsStore: metricsStore}
+	getAttributeChangeHistoryAction.InitBaseAction(baseAction)
 
 	actions := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
 		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
-		&getAttributeValuesAction}
+		&getAttributeValuesAction, &getAttributeChangeHistoryAction}
 
 	app.StartApplication(actions)
 	err = app.RegisterApplication()

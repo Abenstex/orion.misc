@@ -3,6 +3,7 @@ package structs
 import (
 	"encoding/json"
 	"laniakea/micro"
+	"orion.commons/couchdb"
 	"orion.commons/structs"
 )
 
@@ -84,5 +85,32 @@ func (reply GetAttributeValuesReply) Error() string {
 }
 
 func (reply GetAttributeValuesReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}
+
+type GetAttributeValueChangeHistoryReply struct {
+	Header            micro.ReplyHeader                         `json:"header"`
+	ChangedAttributes []couchdb.HistoricizedAttributeDataChange `json:"changedAttributes"`
+}
+
+func (reply GetAttributeValueChangeHistoryReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetAttributeValueChangeHistoryReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetAttributeValueChangeHistoryReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetAttributeValueChangeHistoryReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
