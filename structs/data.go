@@ -30,6 +30,12 @@ type Hierarchy struct {
 	Entries []HierarchyEntry `json:"entries"`
 }
 
+func NewHierarchy() Hierarchy {
+	hierarchy := Hierarchy{Entries: make([]HierarchyEntry, 0)}
+
+	return hierarchy
+}
+
 type HierarchyEntry struct {
 	Index      int    `json:"index"`
 	ObjectType string `json:"objectType"`

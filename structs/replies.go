@@ -114,3 +114,30 @@ func (reply GetAttributeValueChangeHistoryReply) Error() string {
 func (reply GetAttributeValueChangeHistoryReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type GetHierarchiesReply struct {
+	Header      micro.ReplyHeader `json:"header"`
+	Hierarchies []Hierarchy       `json:"hierarchies"`
+}
+
+func (reply GetHierarchiesReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetHierarchiesReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetHierarchiesReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetHierarchiesReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}
