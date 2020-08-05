@@ -26,7 +26,11 @@ type AttributeChange struct {
 }
 
 type Hierarchy struct {
-	Info       structs.BaseInfo `json:"info"`
-	Index      int              `json:"index"`
-	ObjectType string           `json:"objectType"`
+	Info    structs.BaseInfo `json:"info"`
+	Entries []HierarchyEntry `json:"entries"`
+}
+
+type HierarchyEntry struct {
+	Index      int    `json:"index"`
+	ObjectType string `json:"objectType"`
 }

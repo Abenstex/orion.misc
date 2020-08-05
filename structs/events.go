@@ -84,3 +84,19 @@ func (event AttributeValueDeletedEvent) ToJsonString() (string, error) {
 func (event AttributeValueDeletedEvent) GetHeader() micro.EventHeader {
 	return event.Header
 }
+
+type SavedHierarchiesEvent struct {
+	Header      micro.EventHeader `json:"eventHeader"`
+	ObjectType  string            `json:"objectType"`
+	Hierarchies []Hierarchy       `json:"hierarchies"`
+}
+
+func (event SavedHierarchiesEvent) ToJsonString() (string, error) {
+	byteWurst, err := json.Marshal(event)
+
+	return string(byteWurst), err
+}
+
+func (event SavedHierarchiesEvent) GetHeader() micro.EventHeader {
+	return event.Header
+}

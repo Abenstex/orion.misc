@@ -288,3 +288,34 @@ func (request *GetAttributeValueChangeHistoryRequest) HandleResult(reply micro.I
 func (request GetAttributeValueChangeHistoryRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
+
+type SaveHierarchiesRequest struct {
+	Header             micro.RequestHeader `json:"header"`
+	UpdatedHierarchies []Hierarchy         `json:"updatedHierarchies"`
+}
+
+func (request *SaveHierarchiesRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request SaveHierarchiesRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
+
+func (request *SaveHierarchiesRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request SaveHierarchiesRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}

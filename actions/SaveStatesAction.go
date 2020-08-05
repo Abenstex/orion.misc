@@ -31,6 +31,7 @@ func (action SaveStatesAction) BeforeAction(ctx context.Context, request []byte)
 	dummy := structs.SaveStatesRequest{}
 	err := json.Unmarshal(request, &dummy)
 	if err != nil {
+		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).WithError(err).Errorf("error unmarshalling the request: %v\n", string(request))
 		return micro.NewException(structs2.UnmarshalError, err)
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
@@ -129,7 +130,6 @@ func (action *SaveStatesAction) HeyHo(ctx context.Context, request []byte) (micr
 	saveRequest := structs.SaveStatesRequest{}
 
 	err := json.Unmarshal(request, &saveRequest)
-	//fmt.Printf("Saverequest: %v\n", string(request))
 	if err != nil {
 		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).WithError(err).Error("Could not unmarshal request")
 		return structs2.NewErrorReplyHeaderWithOrionErr(structs2.NewOrionError(structs2.UnmarshalError, err),
@@ -198,17 +198,15 @@ func (action *SaveStatesAction) saveStates(updatedStates []structs.State, origin
 	}
 
 	return txn.Commit()
-
-	return nil
 }
 
-func (action *SaveStatesAction) getOriginalState(objectId int64, originalProfiles []structs.State) structs.State {
-	if objectId == -1 || originalProfiles == nil || len(originalProfiles) == 0 {
+func (action *SaveStatesAction) getOriginalState(objectId int64, originalStates []structs.State) structs.State {
+	if objectId == -1 || originalStates == nil || len(originalStates) == 0 {
 		return structs.State{}
 	}
-	for _, profile := range originalProfiles {
-		if objectId == profile.Info.Id {
-			return profile
+	for _, state := range originalStates {
+		if objectId == state.Info.Id {
+			return state
 		}
 	}
 
