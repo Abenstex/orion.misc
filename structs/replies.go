@@ -141,3 +141,57 @@ func (reply GetHierarchiesReply) Error() string {
 func (reply GetHierarchiesReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type EvaluateAttributeReply struct {
+	Header micro.ReplyHeader `json:"header"`
+	Value  *string           `json:"value"`
+}
+
+func (reply EvaluateAttributeReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply EvaluateAttributeReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply EvaluateAttributeReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply EvaluateAttributeReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}
+
+type GetParametersReply struct {
+	Header     micro.ReplyHeader `json:"header"`
+	Parameters []Parameter       `json:"parameters"`
+}
+
+func (reply GetParametersReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetParametersReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetParametersReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetParametersReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}

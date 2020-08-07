@@ -40,3 +40,8 @@ type HierarchyEntry struct {
 	Index      int    `json:"index"`
 	ObjectType string `json:"objectType"`
 }
+
+type Parameter struct {
+	Info  structs.BaseInfo `json:"info"`
+	Value string           `json:"value"`
+}

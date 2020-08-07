@@ -73,8 +73,8 @@ func (action GetAttributeDefinitionsAction) SendEvents(request micro.IRequest) {
 func (action GetAttributeDefinitionsAction) ProvideInformation() micro.ActionInformation {
 	var reply = "orion/server/misc/reply/attributedefinition/get"
 	var error = "orion/server/misc/error/attributedefinition/get"
-	var requestSample = dataStructures.StructToJsonString(micro.RegisterMicroServiceRequest{})
-	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
+	var requestSample = dataStructures.StructToJsonString(structs.GetAttributeDefinitionsRequest{})
+	var replySample = dataStructures.StructToJsonString(structs.GetAttributeDefinitionsReply{})
 	info := micro.ActionInformation{
 		Name:           "GetAttributeDefinitionsAction",
 		Description:    "Get attribute definitions based on conditions or all if no conditions were sent in the request",

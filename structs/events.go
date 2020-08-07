@@ -100,3 +100,19 @@ func (event SavedHierarchiesEvent) ToJsonString() (string, error) {
 func (event SavedHierarchiesEvent) GetHeader() micro.EventHeader {
 	return event.Header
 }
+
+type ParameterSavedEvent struct {
+	Header     micro.EventHeader `json:"eventHeader"`
+	ObjectType string            `json:"objectType"`
+	Parameters []Parameter       `json:"parameters"`
+}
+
+func (event ParameterSavedEvent) ToJsonString() (string, error) {
+	byteWurst, err := json.Marshal(event)
+
+	return string(byteWurst), err
+}
+
+func (event ParameterSavedEvent) GetHeader() micro.EventHeader {
+	return event.Header
+}

@@ -63,6 +63,8 @@ SaveStatesAction = true
 DeleteStateAction = true
 SetAttributeValueAction = true
 DeleteAttributeDefinitionAction = true
+SaveParametersAction = true
+DeleteParameterAction = true
 
 [metrics]
 [metrics.SaveStatesAction]
@@ -70,11 +72,10 @@ monitor = true
 maxSize = 5
 [metrics.SetAttributeValueAction]
 monitor = true
-maxSize = 2
-[metrics.GetAttributeValuesPerObjectAction]
+maxSize = 1
+[metrics.SaveParametersAction]
 monitor = true
-maxSize = 5
-[metrics.GetAttributeDefinitionsAction]
+maxSize = 3
+[metrics.DeleteParameterAction]
 monitor = true
-maxSize = 5
-
+maxSize = 1

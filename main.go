@@ -67,11 +67,18 @@ func main() {
 	deleteHierarchyAction.InitBaseAction(baseAction)
 	getHierarchiesAction := actions.GetHierarchiesAction{MetricsStore: metricsStore}
 	getHierarchiesAction.InitBaseAction(baseAction)
+	saveParametersAction := actions.SaveParametersAction{MetricsStore: metricsStore}
+	saveParametersAction.InitBaseAction(baseAction)
+	deleteParameterAction := actions.DeleteParameterAction{MetricsStore: metricsStore}
+	deleteParameterAction.InitBaseAction(baseAction)
+	getParametersAction := actions.GetParametersAction{MetricsStore: metricsStore}
+	getParametersAction.InitBaseAction(baseAction)
 
 	actions := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
 		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
 		&getAttributeValuesAction, &getAttributeChangeHistoryAction, &saveHierarchiesAction,
-		&deleteHierarchyAction, &getHierarchiesAction}
+		&deleteHierarchyAction, &getHierarchiesAction, &saveParametersAction, &deleteParameterAction,
+		&getParametersAction}
 
 	app.StartApplication(actions)
 	err = app.RegisterApplication()

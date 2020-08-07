@@ -1,74 +1,82 @@
 title = "ORION.Misc Config"
- [database]
-     host= "rengstlcloud.spdns.de"
-     port= 5432
-     user= "orion"
-     password= "orion"
-     dbname= "orion"
-     maxIdleConnections=10
-     maxOpenConnections=10
+[database]
+host = "rengstlcloud.spdns.de"
+port = 5432
+user = "orion"
+password = "orion"
+dbname = "orion"
+maxIdleConnections = 10
+maxOpenConnections = 10
 
-   [couchdb]
-     host = "192.168.2.43"
-     user = "orion"
-     password = "orion"
-     database = "orion_requests"
-     runtimeDatabase = "orion_data_changes"
-     databaseLogging = "orion_log"
-     port = 5984
+[couchdb]
+host = "192.168.2.43"
+user = "orion"
+password = "orion"
+database = "orion_requests"
+runtimeDatabase = "orion_data_changes"
+databaseLogging = "orion_log"
+port = 5984
 
-   [logging]
-     logDirectory="/Users/chren/entwicklung/go/src/orion.misc/logs"
-     useLocalTime = true
-     maxFileAge = 3
-     maxBackups = 3
-     maxFileSize = 2
-     defaultLogLevel = "debug"
+[logging]
+logDirectory = "/Users/chren/entwicklung/go/src/orion.misc/logs"
+useLocalTime = true
+maxFileAge = 3
+maxBackups = 3
+maxFileSize = 2
+defaultLogLevel = "debug"
 
-   [messagebus]
-     host="tcp://192.168.2.43"
-     port= 1883
-     autoReconnect= true
-     connectRetry= true
-     connectRetryInterval= 10
-     connectionTimeout= 0
-     path="/mqtt"
-     baseTopic="orion/server/misc/request/#"
-     baseErrorTopic="orion/server/misc/error"
-     replyQos = 0
-     requestQos = 1
-     publishEventQos = 0
+[messagebus]
+host = "tcp://192.168.2.43"
+port = 1883
+autoReconnect = true
+connectRetry = true
+connectRetryInterval = 10
+connectionTimeout = 0
+path = "/mqtt"
+baseTopic = "orion/server/misc/request/#"
+baseErrorTopic = "orion/server/misc/error"
+replyQos = 0
+requestQos = 1
+publishEventQos = 0
 
-   [general]
-     # The heartbeat interval in seconds
-     heartBeatInterval=10
-     applicationId= 99
-     useCache=true
-     # The expiration duration of JWTs in minutes
-     jwtExpirationDuration=10080
-     # The default timeout; will be converted into ms
-     timeout=15000
-     # Are multiple logins per user allowed(true) or not
-     allowMultipleLogin=true
+[general]
+# The heartbeat interval in seconds
+heartBeatInterval = 10
+applicationId = 99
+useCache = true
+# The expiration duration of JWTs in minutes
+jwtExpirationDuration = 10080
+# The default timeout; will be converted into ms
+timeout = 15000
+# Are multiple logins per user allowed(true) or not
+allowMultipleLogin = true
 
-   [http]
-     serveHttpRequests=true
-     port=8083
-     registrationURL="http://192.168.2.43:9090/orion/server/core/request/service/register"
-     unregistrationURL="http://192.168.2.43:9090/orion/server/core/request/service/unregister"
-     addMetricsUrl="http://192.168.2.43:9090/orion/server/core/request/metrics/add"
+[http]
+serveHttpRequests = true
+port = 8083
+registrationURL = "http://192.168.2.43:9090/orion/server/core/request/service/register"
+unregistrationURL = "http://192.168.2.43:9090/orion/server/core/request/service/unregister"
+addMetricsUrl = "http://192.168.2.43:9090/orion/server/core/request/metrics/add"
 
-   [history]
-     SaveStatesAction = true
-     DeleteStateAction = true
-     SetAttributeValueAction = true
-     DeleteAttributeDefinitionAction = true
+[history]
+SaveStatesAction = true
+DeleteStateAction = true
+SetAttributeValueAction = true
+DeleteAttributeDefinitionAction = true
+SaveParametersAction = true
+DeleteParameterAction = true
 
-   [metrics]
-    [metrics.SaveStatesAction]
-        monitor = true
-        maxSize = 5
-    [metrics.SetAttributeValueAction]
-        monitor = true
-        maxSize = 1
+[metrics]
+[metrics.SaveStatesAction]
+monitor = true
+maxSize = 5
+[metrics.SetAttributeValueAction]
+monitor = true
+maxSize = 1
+[metrics.SaveParametersAction]
+monitor = true
+maxSize = 3
+[metrics.DeleteParameterAction]
+monitor = true
+maxSize = 1
 

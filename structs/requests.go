@@ -350,3 +350,97 @@ func (request *GetHierarchiesRequest) HandleResult(reply micro.IReply) micro.IRe
 func (request GetHierarchiesRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
+
+type EvaluateAttributeRequest struct {
+	Header      micro.RequestHeader `json:"header"`
+	ObjectId    int64               `json:"objectId"`
+	AttributeId int64               `json:"attributeId"`
+}
+
+func (request *EvaluateAttributeRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request EvaluateAttributeRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *EvaluateAttributeRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request EvaluateAttributeRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
+
+type SaveParametersRequest struct {
+	Header     micro.RequestHeader `json:"header"`
+	Parameters []Parameter         `json:"parameters"`
+}
+
+func (request *SaveParametersRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request SaveParametersRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
+
+func (request *SaveParametersRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request SaveParametersRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+type GetParametersRequest struct {
+	Header      micro.RequestHeader `json:"header"`
+	WhereClause *string             `json:"whereClause"`
+}
+
+func (request *GetParametersRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request GetParametersRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *GetParametersRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request GetParametersRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
