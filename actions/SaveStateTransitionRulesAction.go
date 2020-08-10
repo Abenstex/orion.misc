@@ -77,7 +77,7 @@ func (action SaveStateTransitionRulesAction) SendEvents(request micro.IRequest) 
 		ids = append(ids, state.Info.Id)
 	}
 	event := structs.SavedStateTransitionRulesEvent{
-		Header:               *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:               *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		StateTransitionRules: action.savedStateTransitionRules,
 		ObjectType:           "STATETRANSITIONRULE",
 	}

@@ -92,7 +92,7 @@ func (action SetAttributeValueAction) SendEvents(request micro.IRequest) {
 		return
 	}
 	event := structs2.AttributeValueChangedEvent{
-		Header:           *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:           *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		AttributeChanges: action.attributeChanges,
 	}
 

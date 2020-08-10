@@ -77,7 +77,7 @@ func (action DeleteHierarchyAction) SendEvents(request micro.IRequest) {
 		return
 	}
 	event := structs.DeletedEvent{
-		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), delRequest.Header.SenderId, ""),
 		ObjectId:   delRequest.ObjectId,
 		ObjectType: "HIERARCHY",
 		ObjectName: action.objectName,

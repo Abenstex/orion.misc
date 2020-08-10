@@ -77,7 +77,7 @@ func (action SaveHierarchiesAction) SendEvents(request micro.IRequest) {
 		ids = append(ids, hierarchy.Info.Id)
 	}
 	event := structs.SavedHierarchiesEvent{
-		Header:      *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:      *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		Hierarchies: action.savedHierarchies,
 		ObjectType:  "HIERARCHY",
 	}

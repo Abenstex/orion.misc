@@ -73,7 +73,7 @@ func (action DefineAttributesAction) SendEvents(request micro.IRequest) {
 		return
 	}
 	event := structs2.AttributeDefinitionSavedEvent{
-		Header:               *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:               *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		AttributeDefinitions: action.savedObjects,
 		ObjectType:           "AttributeDefinition",
 	}

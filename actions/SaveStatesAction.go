@@ -79,7 +79,7 @@ func (action SaveStatesAction) SendEvents(request micro.IRequest) {
 		ids = append(ids, state.Info.Id)
 	}
 	event := structs.SavedStatesEvent{
-		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		States:     action.savedStates,
 		ObjectType: "STATE",
 	}

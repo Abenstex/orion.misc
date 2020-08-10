@@ -76,7 +76,7 @@ func (action SaveParametersAction) SendEvents(request micro.IRequest) {
 		ids = append(ids, parameter.Info.Id)
 	}
 	event := structs2.ParameterSavedEvent{
-		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		Parameters: action.savedObjects,
 		ObjectType: "PARAMETER",
 	}

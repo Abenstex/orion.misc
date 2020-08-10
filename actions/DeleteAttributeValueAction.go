@@ -75,7 +75,7 @@ func (action DeleteAttributeValueAction) SendEvents(request micro.IRequest) {
 		return
 	}
 	event := structs.AttributeValueDeletedEvent{
-		Header:      *micro.NewEventHeaderForAction(action.ProvideInformation(), request.GetHeader().SenderId, ""),
+		Header:      *micro.NewEventHeaderForAction(action.ProvideInformation(), delRequest.Header.SenderId, ""),
 		AttributeId: action.deleteRequest.AttributeId,
 		ObjectId:    action.deleteRequest.ObjectId,
 	}
