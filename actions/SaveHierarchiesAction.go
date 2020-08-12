@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"laniakea/dataStructures"
 	"laniakea/logging"
@@ -16,6 +18,7 @@ import (
 	structs2 "orion.commons/structs"
 	"orion.commons/utils"
 	"orion.misc/structs"
+	"strings"
 	"time"
 )
 
@@ -23,6 +26,7 @@ type SaveHierarchiesAction struct {
 	baseAction       micro.BaseAction
 	MetricsStore     *utils.MetricsStore
 	savedHierarchies []structs.Hierarchy
+	receivedTime     int64
 }
 
 func (action SaveHierarchiesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -128,6 +132,7 @@ func (action *SaveHierarchiesAction) HeyHo(ctx context.Context, request []byte) 
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
 	saveRequest := structs.SaveHierarchiesRequest{}
+	action.receivedTime = utils2.GetCurrentTimeStamp()
 
 	err := json.Unmarshal(request, &saveRequest)
 	if err != nil {
@@ -166,15 +171,17 @@ func (action *SaveHierarchiesAction) saveHierarchies(updatedHierarchies []struct
 		}
 		return micro.NewException(structs2.DatabaseError, err)
 	}
+	ids := make([]int64, len(updatedHierarchies), len(updatedHierarchies))
 
 	for idx, hierarchy := range updatedHierarchies {
 		var id int64
 		if hierarchy.Info.Id > 0 {
-			err = utils.DeleteObjectByIdWithTransaction(txn, "ref_hierarchies_types", hierarchy.Info.Id)
+			fmt.Printf("Deleting hierarchy refs with id: %v\n", hierarchy.Info.Id)
+			/*err = utils.DeleteObjectByIdWithTransaction(txn, "ref_hierarchies_types", hierarchy.Info.Id)
 			if err != nil {
 				txn.Rollback()
 				return micro.NewException(structs2.DatabaseError, err)
-			}
+			}*/
 		} else {
 			err = utils2.ExecuteInsertWithTransactionWithAutoId(txn, insertSql, &id, hierarchy.Info.Name,
 				hierarchy.Info.Description, hierarchy.Info.Active, user, hierarchy.Info.Alias, "HIERARCHY")
@@ -189,20 +196,48 @@ func (action *SaveHierarchiesAction) saveHierarchies(updatedHierarchies []struct
 			txn.Rollback()
 			return exception
 		}
+		ids[idx] = hierarchy.Info.Id
 		action.savedHierarchies[idx] = hierarchy
 	}
 
 	err = txn.Commit()
 
+	exception := action.deleteLeftovers(ids)
+	if exception != nil {
+		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
+			WithFields(logrus.Fields{"exception": exception, "ids": ids}).
+			Error("could not delete data from ref_hierarchies_types")
+	}
+
 	return micro.NewException(structs2.DatabaseError, err)
 }
 
+func (action *SaveHierarchiesAction) deleteLeftovers(ids []int64) *micro.Exception {
+	delQuery := "DELETE FROM ref_hierarchies_types WHERE hierarchy_id=$1 " +
+		"AND (change_date IS NULL OR change_date < to_timestamp($2) )"
+	for _, id := range ids {
+		fmt.Printf("Executing query: %v for id %v and received time %v\n", delQuery, id, action.receivedTime/1000)
+		err := utils2.ExecuteQueryInTransaction(action.baseAction.Environment, delQuery, id, action.receivedTime/1000)
+		if err != nil {
+			return micro.NewException(structs2.DatabaseError, err)
+		}
+	}
+
+	return nil
+}
+
 func (action *SaveHierarchiesAction) saveReferences(hierarchy structs.Hierarchy, tx *sql.Tx, user string) *micro.Exception {
-	insertSqlRef := "INSERT INTO ref_hierarchies_types (hierarchy_id, index, object_type, action_by) " +
-		"VALUES ($1, $2, $3, $4) "
+	insertSqlRef := "INSERT INTO ref_hierarchies_types (hierarchy_id, index, object_type, action_by, change_date) " +
+		"VALUES ($1, $2, $3, $4, to_timestamp($5)) " +
+		"ON CONFLICT ON CONSTRAINT ref_hierarchies_types_unique_constraint " +
+		"DO UPDATE SET index = $6, action_by = $7, change_date=to_timestamp($8) "
+
+	fmt.Printf("Received time: %v\n", action.receivedTime)
+
 	for _, entry := range hierarchy.Entries {
 		err := utils2.ExecuteQueryWithTransaction(tx, insertSqlRef, hierarchy.Info.Id,
-			entry.Index, entry.ObjectType, user)
+			entry.Index, strings.TrimSpace(entry.ObjectType), user, action.receivedTime/1000,
+			entry.Index, user, action.receivedTime/1000)
 		if err != nil {
 			tx.Rollback()
 			return micro.NewException(structs2.DatabaseError, err)
