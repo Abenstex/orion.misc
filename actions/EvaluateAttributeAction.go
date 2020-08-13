@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"github.com/lib/pq"
 	"laniakea/dataStructures"
 	"laniakea/micro"
 	"net/http"
@@ -20,6 +22,17 @@ type EvaluateAttributeAction struct {
 	MetricsStore *utils.MetricsStore
 }
 
+type AttributeToEvaluate struct {
+	DataType      string
+	Overwriteable bool
+	Query         *string
+	ObjectType    string
+	DefaultValue  *string
+	ListOfValues  *[]string
+	Value         *string
+	HierarchyId   *int64
+}
+
 func (action EvaluateAttributeAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
 	dummy := structs.EvaluateAttributeRequest{}
 	err := json.Unmarshal(request, &dummy)
@@ -27,6 +40,10 @@ func (action EvaluateAttributeAction) BeforeAction(ctx context.Context, request 
 		return micro.NewException(structs2.UnmarshalError, err)
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+
+	if dummy.AttributeId <= 0 || dummy.ObjectId <= 0 {
+		return micro.NewException(structs2.MissingParameterError, fmt.Errorf("not all parameters (attribute_id and object_id) were provided"))
+	}
 
 	return micro.NewException(structs2.RequestHeaderInvalid, err)
 }
@@ -96,12 +113,26 @@ func (action *EvaluateAttributeAction) HeyHo(ctx context.Context, request []byte
 	return nil, nil
 }
 
-func (action *EvaluateAttributeAction) evaluateAttribute(request structs.GetAttributeDefinitionsRequest) (string, *micro.Exception) {
-	/*query := "SELECT a.datatype, a.overwriteable, a.query, b.object_type, a.default_value," +
-	" b.attr_value, c.hierarchy_id" +
-	" FROM attributes a LEFT OUTER JOIN ref_attributes_objects b ON a.id = b.attr_id" +
-	" LEFT OUTER JOIN ref_hierarchies_types c ON b.object_type=c.object_type" +
-	" WHERE a.id=$1 and b.object_id=$2"*/
+func (action *EvaluateAttributeAction) evaluateAttribute(request structs.EvaluateAttributeRequest) (string, *micro.Exception) {
+	query := "SELECT a.datatype, a.overwriteable, a.query, b.object_type, a.default_value, a.list_of_values," +
+		" b.attr_value, c.hierarchy_id" +
+		" FROM attributes a LEFT OUTER JOIN ref_attributes_objects b ON a.id = b.attr_id" +
+		" LEFT OUTER JOIN ref_hierarchies_types c ON b.object_type=c.object_type" +
+		" WHERE a.id=$1 and b.object_id=$2"
+
+	rows, err := action.GetBaseAction().Environment.Database.Query(query, request.AttributeId, request.ObjectId)
+	if err != nil {
+		return "", micro.NewException(structs2.DatabaseError, err)
+	}
+	defer rows.Close()
+
+	attribute := AttributeToEvaluate{}
+	err = rows.Scan(&attribute.DataType, &attribute.Overwriteable, &attribute.Query, &attribute.ObjectType,
+		&attribute.DefaultValue, pq.Array(&attribute.ListOfValues), &attribute.Value, &attribute.HierarchyId)
+
+	if !attribute.Overwriteable && attribute.Value != nil {
+		return *attribute.Value, nil
+	}
 
 	return "", nil
 }
