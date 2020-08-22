@@ -56,7 +56,7 @@ func (action *SetAttributeValueAction) AfterActionAsync(ctx context.Context, rep
 	// HistoricizeAttributeChange(request string, requestPath, oldValue, newValue, referencedType string, receivedTime int64)
 	for _, change := range action.attributeChanges {
 		err := couchdb.HistoricizeAttributeChange(requestString, action.ProvideInformation().RequestPath, change.OriginalValue,
-			change.NewValue, change.ObjectType, change.AttributeId, change.ObjectId, action.setRequest.Header.ReceivedTimeInMillis)
+			change.NewValue, change.ObjectType, change.AttributeId, change.ObjectId, action.setRequest.Header.ReceivedTimeInMillis, change.ObjectVersion)
 		if err != nil {
 			logging.GetLogger("SetAttributeValueAction",
 				action.GetBaseAction().Environment,
@@ -165,10 +165,10 @@ func (action *SetAttributeValueAction) HeyHo(ctx context.Context, request []byte
 }
 
 func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttributeValueRequest) *micro.Exception {
-	query := "INSERT INTO ref_attributes_objects (attr_id, attr_value, object_type, object_id, action_by) " +
-		"VALUES ($1, $2, $3, $4, $5) " +
+	query := "INSERT INTO ref_attributes_objects (attr_id, attr_value, object_type, object_id, action_by, object_version) " +
+		"VALUES ($1, $2, $3, $4, $5, $6) " +
 		"ON CONFLICT ON CONSTRAINT ref_attributes_objects_unique_constraint " +
-		"DO UPDATE SET attr_value = $6, action_by = $7 "
+		"DO UPDATE SET attr_value = $7, action_by = $8 "
 
 	txn, err := action.baseAction.Environment.Database.Begin()
 	if err != nil {
@@ -180,7 +180,7 @@ func (action SetAttributeValueAction) saveAttribute(request structs2.SetAttribut
 
 	for _, attribute := range request.Attributes {
 		err = utils2.ExecuteQueryWithTransaction(txn, query, attribute.Info.Id, attribute.Value,
-			attribute.ObjectType, attribute.ObjectId, request.Header.User, attribute.Value, request.Header.User)
+			attribute.ObjectType, attribute.ObjectId, request.Header.User, attribute.ObjectVersion, attribute.Value, request.Header.User)
 		if err != nil {
 			txn.Rollback()
 			logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
@@ -203,7 +203,8 @@ func (action *SetAttributeValueAction) getOldValueBeforeUpdate(request structs2.
 		objectIds = append(objectIds, tmp.ObjectId)
 		newValueMap[uint64(tmp.Info.Id)] = tmp
 	}
-	query := "SELECT attr_value, attr_id, object_id, object_type FROM ref_attributes_objects WHERE attr_id = ANY($1::bigint[]) AND object_id = ANY($2::bigint[])"
+	query := "SELECT attr_value, attr_id, object_id, object_type, object_version " +
+		"FROM ref_attributes_objects WHERE attr_id = ANY($1::bigint[]) AND object_id = ANY($2::bigint[])"
 	rows, err := action.GetBaseAction().Environment.Database.Query(query, pq.Array(attrIds), pq.Array(objectIds))
 	if err != nil {
 		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
@@ -216,7 +217,7 @@ func (action *SetAttributeValueAction) getOldValueBeforeUpdate(request structs2.
 	var attributeChanges []structs2.AttributeChange
 	for rows.Next() {
 		var change structs2.AttributeChange
-		err := rows.Scan(&change.OriginalValue, &change.AttributeId, &change.ObjectId, &change.ObjectType)
+		err := rows.Scan(&change.OriginalValue, &change.AttributeId, &change.ObjectId, &change.ObjectType, &change.ObjectVersion)
 		if err != nil {
 			logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
 				WithError(err).

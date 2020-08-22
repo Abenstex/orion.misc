@@ -21,6 +21,7 @@ type AttributeChange struct {
 	AttributeId   uint64
 	ObjectType    string
 	ObjectId      uint64
+	ObjectVersion int
 	OriginalValue string
 	NewValue      string
 }
@@ -44,4 +45,9 @@ type HierarchyEntry struct {
 type Parameter struct {
 	Info  structs.BaseInfo `json:"info"`
 	Value string           `json:"value"`
+}
+
+type Category struct {
+	Info           structs.BaseInfo `json:"info"`
+	ReferencedType string           `json:"referencedType"`
 }

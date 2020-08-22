@@ -19,18 +19,18 @@ func main() {
 	flag.Parse()
 
 	app := actions.MiscApp{}
-	app.AppInfo.ActionInformation = make([]micro.ActionInformation, 15)
+	app.AppInfo.ActionInformation = make([]micro.ActionInformation, 25)
 
 	shutdown.Add(func() {
-		app.UnregisterApplication()
+		_ = app.UnregisterApplication()
 		time.Sleep(5 * time.Second)
-		app.StopApplication()
+		_ = app.StopApplication()
 	})
 
 	env, err := app.Init(*configPath)
 	if err != nil {
 		logging.GetLogger("general_errors", env, true).WithError(err).Fatal("Could not init application server")
-		app.StopApplication()
+		_ = app.StopApplication()
 	}
 	metricsStore := new(utils.MetricsStore)
 
@@ -73,19 +73,25 @@ func main() {
 	deleteParameterAction.InitBaseAction(baseAction)
 	getParametersAction := actions.GetParametersAction{MetricsStore: metricsStore}
 	getParametersAction.InitBaseAction(baseAction)
+	saveCategoriesAction := actions.SaveCategoriesAction{MetricsStore: metricsStore}
+	saveCategoriesAction.InitBaseAction(baseAction)
+	getCategoriesAction := actions.GetCategoriesAction{MetricsStore: metricsStore}
+	getCategoriesAction.InitBaseAction(baseAction)
+	deleteCategoryAction := actions.DeleteCategoryAction{MetricsStore: metricsStore}
+	deleteCategoryAction.InitBaseAction(baseAction)
 
-	actions := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
+	services := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
 		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
 		&getAttributeValuesAction, &getAttributeChangeHistoryAction, &saveHierarchiesAction,
 		&deleteHierarchyAction, &getHierarchiesAction, &saveParametersAction, &deleteParameterAction,
-		&getParametersAction}
+		&getParametersAction, &saveCategoriesAction, &getCategoriesAction, &deleteCategoryAction}
 
-	app.StartApplication(actions)
+	_ = app.StartApplication(services)
 	err = app.RegisterApplication()
 	if err != nil {
 		fmt.Printf("An error occurred during registration: %v\nShutting down...\n", err)
 		logging.GetLogger("general_errors", env, true).WithError(err).Fatal("Could not register application. Shutting down...")
-		app.StopApplication()
+		_ = app.StopApplication()
 	}
 
 	shutdown.Listen(syscall.SIGINT, syscall.SIGTERM)

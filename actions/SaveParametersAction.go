@@ -155,7 +155,7 @@ func (action *SaveParametersAction) saveObjects(parameters []structs2.Parameter,
 	insertSql := "INSERT INTO parameters (name, description, active, action_by, " +
 		"pretty_id, value, object_type) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id"
 	updateSql := "UPDATE parameters SET  name = $1, description = $2, active = $3, action_by = $4, " +
-		"pretty_id = $5, value = 6 WHERE id = 7 "
+		"pretty_id = $5, value = $6 WHERE id = $7 "
 	action.savedObjects = make([]structs2.Parameter, len(parameters), len(parameters))
 
 	txn, err := action.GetBaseAction().Environment.Database.Begin()

@@ -195,3 +195,30 @@ func (reply GetParametersReply) Error() string {
 func (reply GetParametersReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type GetCategoriesReply struct {
+	Header     micro.ReplyHeader `json:"header"`
+	Categories []Category        `json:"categories"`
+}
+
+func (reply GetCategoriesReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetCategoriesReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetCategoriesReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetCategoriesReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}
