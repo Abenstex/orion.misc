@@ -21,7 +21,7 @@ import (
 )
 
 const ApplicationName = "ORION.Misc"
-const ApplicationVersion = "0.0.1"
+const ApplicationVersion = "0.0.3"
 const HeartbeatTopic = "orion/server/heartbeat/misc"
 
 type MiscApp struct {

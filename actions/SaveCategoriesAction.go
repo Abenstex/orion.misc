@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/spf13/viper"
 	"laniakea/dataStructures"
 	"laniakea/logging"
@@ -26,13 +27,13 @@ type SaveCategoriesAction struct {
 	saveRequest  structs2.SaveCategoriesRequest
 }
 
-func (action SaveCategoriesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
+func (action *SaveCategoriesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
 	dummy := structs2.SaveCategoriesRequest{}
 	err := json.Unmarshal(request, &dummy)
 	if err != nil {
 		return micro.NewException(structs.UnmarshalError, err)
 	}
-	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+	err = app.DefaultHandleActionRequest(request, &dummy.Header, action, true)
 
 	action.saveRequest = dummy
 
@@ -129,9 +130,11 @@ func (action *SaveCategoriesAction) HeyHo(ctx context.Context, request []byte) (
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
+	dummy, _ := json.Marshal(action.saveRequest)
+	fmt.Printf("Request: %v\n", string(dummy))
+
 	exception := action.saveObjects(action.saveRequest.UpdatedCategories, action.saveRequest.Header.User)
 	if exception != nil {
-		//fmt.Printf("Save Users error: %v\n", err)
 		logging.GetLogger("SaveCategoriesAction",
 			action.GetBaseAction().Environment,
 			true).WithField("exception:", exception).Error("Data could not be saved")
