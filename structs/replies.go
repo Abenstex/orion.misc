@@ -222,3 +222,30 @@ func (reply GetCategoriesReply) Error() string {
 func (reply GetCategoriesReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type GetObjectsPerCategoriesReply struct {
+	Header  micro.ReplyHeader  `json:"header"`
+	Objects []structs.BaseInfo `json:"objects"`
+}
+
+func (reply GetObjectsPerCategoriesReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetObjectsPerCategoriesReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetObjectsPerCategoriesReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetObjectsPerCategoriesReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}

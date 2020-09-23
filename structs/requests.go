@@ -506,3 +506,65 @@ func (request *GetCategoriesRequest) HandleResult(reply micro.IReply) micro.IReq
 func (request GetCategoriesRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
+
+type GetObjectsPerCategoriesRequest struct {
+	Header     micro.RequestHeader `json:"header"`
+	CategoryId *int64              `json:"categoryId"`
+}
+
+func (request *GetObjectsPerCategoriesRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request GetObjectsPerCategoriesRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *GetObjectsPerCategoriesRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request GetObjectsPerCategoriesRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
+
+type SaveObjectCategoryReferenceRequest struct {
+	Header             micro.RequestHeader           `json:"header"`
+	CategoryReferences map[uint64][]structs.BaseInfo `json:"categoryReferences"`
+}
+
+func (request *SaveObjectCategoryReferenceRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request SaveObjectCategoryReferenceRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *SaveObjectCategoryReferenceRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request SaveObjectCategoryReferenceRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}

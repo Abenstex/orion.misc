@@ -39,6 +39,8 @@ func (action *SetAttributeValueAction) BeforeAction(ctx context.Context, request
 	if err != nil {
 		return micro.NewException(structs.RequestHeaderInvalid, err)
 	}
+	action.setRequest = dummy
+
 	return action.getOldValueBeforeUpdate(dummy)
 }
 

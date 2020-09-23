@@ -79,12 +79,17 @@ func main() {
 	getCategoriesAction.InitBaseAction(baseAction)
 	deleteCategoryAction := actions.DeleteCategoryAction{MetricsStore: metricsStore}
 	deleteCategoryAction.InitBaseAction(baseAction)
+	getObjectsPerCategoryAction := actions.GetObjectsPerCategoryAction{MetricsStore: metricsStore}
+	getObjectsPerCategoryAction.InitBaseAction(baseAction)
+	saveCategorieReferencesAction := actions.SaveObjectCategoryReferenceAction{MetricsStore: metricsStore}
+	saveCategorieReferencesAction.InitBaseAction(baseAction)
 
 	services := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
 		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
 		&getAttributeValuesAction, &getAttributeChangeHistoryAction, &saveHierarchiesAction,
 		&deleteHierarchyAction, &getHierarchiesAction, &saveParametersAction, &deleteParameterAction,
-		&getParametersAction, &saveCategoriesAction, &getCategoriesAction, &deleteCategoryAction}
+		&getParametersAction, &saveCategoriesAction, &getCategoriesAction, &deleteCategoryAction,
+		&saveCategorieReferencesAction, &getObjectsPerCategoryAction}
 
 	_ = app.StartApplication(services)
 	err = app.RegisterApplication()
