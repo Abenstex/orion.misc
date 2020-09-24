@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"laniakea/dataStructures"
@@ -91,11 +93,9 @@ func (action SaveObjectCategoryReferenceAction) SendEvents(request micro.IReques
 }
 
 func (action SaveObjectCategoryReferenceAction) getCategoryKeysAsSlice() []uint64 {
-	keys := make([]uint64, len(action.setRequest.CategoryReferences))
-	idx := 0
-	for k := range action.setRequest.CategoryReferences {
-		keys[idx] = k
-		idx++
+	keys := make([]uint64, 0, len(action.setRequest.CategoryReferences))
+	for _, ref := range action.setRequest.CategoryReferences {
+		keys = append(keys, ref.CategoryId)
 	}
 
 	return keys
@@ -136,11 +136,14 @@ func (action *SaveObjectCategoryReferenceAction) HeyHo(ctx context.Context, requ
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
-	err := json.Unmarshal(request, &action.setRequest)
+	/*err := json.Unmarshal(request, &action.setRequest)
 	if err != nil {
 		return structs.NewErrorReplyHeaderWithOrionErr(structs.NewOrionError(structs.UnmarshalError, err),
 			action.ProvideInformation().ErrorReplyPath.String), &action.setRequest
-	}
+	}*/
+
+	dummy, _ := json.Marshal(action.setRequest)
+	fmt.Printf("Request: %v\n", string(dummy))
 
 	exception := action.saveCategoryReference(action.setRequest)
 	if exception != nil {
@@ -161,23 +164,15 @@ func (action *SaveObjectCategoryReferenceAction) HeyHo(ctx context.Context, requ
 	return reply, &action.setRequest
 }
 
-func (action SaveObjectCategoryReferenceAction) saveSingleCategory(categoryId uint64, objects []structs.BaseInfo, user string, txn *sql.Tx) *micro.Exception {
+func (action SaveObjectCategoryReferenceAction) saveSingleCategory(reference structs2.CategoryReference, user string, txn *sql.Tx) *micro.Exception {
 	insertQuery := "INSERT INTO ref_categories_objects (category_id, object_type, object_id, action_by, object_version) " +
 		" VALUES ($1, $2, $3, $4, $5) " +
 		" ON CONFLICT ON CONSTRAINT ref_categories_objects_unique_constraint DO NOTHING "
-	deleteQuery := "DELETE FROM ref_categories_objects WHERE category_id=$1"
 
-	_, err := txn.Exec(deleteQuery, categoryId)
+	_, err := txn.Exec(insertQuery, reference.CategoryId, reference.ObjectType, reference.ObjectId, user, reference.ObjectVersion)
 	if err != nil {
 		txn.Rollback()
 		return micro.NewException(structs.DatabaseError, err)
-	}
-	for _, object := range objects {
-		_, err := txn.Exec(insertQuery, categoryId, object.ObjectType, object.Id, user, object.Version)
-		if err != nil {
-			txn.Rollback()
-			return micro.NewException(structs.DatabaseError, err)
-		}
 	}
 
 	return nil
@@ -191,9 +186,17 @@ func (action SaveObjectCategoryReferenceAction) saveCategoryReference(request st
 			Error("transaction could not be started")
 		return micro.NewException(structs.DatabaseError, err)
 	}
+	catIds := action.getCategoryKeysAsSlice()
+	deleteQuery := "DELETE FROM ref_categories_objects WHERE category_id = ANY($1::bigint[])"
 
-	for key, value := range request.CategoryReferences {
-		exception := action.saveSingleCategory(key, value, request.Header.User, txn)
+	_, err = txn.Exec(deleteQuery, pq.Array(catIds))
+	if err != nil {
+		txn.Rollback()
+		return micro.NewException(structs.DatabaseError, err)
+	}
+
+	for _, reference := range request.CategoryReferences {
+		exception := action.saveSingleCategory(reference, request.Header.User, txn)
 		if exception != nil {
 			return exception
 		}

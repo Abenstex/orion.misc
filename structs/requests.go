@@ -539,8 +539,8 @@ func (request GetObjectsPerCategoriesRequest) GetHeader() *micro.RequestHeader {
 }
 
 type SaveObjectCategoryReferenceRequest struct {
-	Header             micro.RequestHeader           `json:"header"`
-	CategoryReferences map[uint64][]structs.BaseInfo `json:"categoryReferences"`
+	Header             micro.RequestHeader `json:"header"`
+	CategoryReferences []CategoryReference `json:"categoryReferences"`
 }
 
 func (request *SaveObjectCategoryReferenceRequest) UpdateHeader(header *micro.RequestHeader) {

@@ -51,3 +51,10 @@ type Category struct {
 	Info           structs.BaseInfo `json:"info"`
 	ReferencedType string           `json:"referencedType"`
 }
+
+type CategoryReference struct {
+	CategoryId    uint64 `json:"categoryId"`
+	ObjectId      uint64 `json:"objectId"`
+	ObjectType    string `json:"objectType"`
+	ObjectVersion int    `json:"objectVersion"`
+}
