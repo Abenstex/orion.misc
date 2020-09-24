@@ -18,9 +18,10 @@ import (
 	"time"
 )
 
-const SqlGetObjectsPerCategory = "SELECT b.object_id, b.object_type, b.object_version " +
-	" FROM categories a INNER JOIN ref_categories_objects b ON a.id = b.category_id " +
-	" WHERE a.id=$1"
+const SqlGetObjectsPerCategory = "SELECT b.name, b.description, b.id, b.active, (extract(epoch from b.created_date)::bigint)*1000 AS created_date, " +
+	" b.pretty_id, b.object_type, b.version " +
+	" FROM ref_categories_objects a inner join objects b on a.object_id=b.id " +
+	" WHERE a.category_id=$1"
 
 type GetObjectsPerCategoryAction struct {
 	baseAction   micro.BaseAction
@@ -142,9 +143,9 @@ func (action GetObjectsPerCategoryAction) fillBaseInfos(rows *sql.Rows) ([]struc
 	for rows.Next() {
 		var object structs2.BaseInfo
 		/*
-			b.object_id, b.object_type, b.object_version
+			b.name, b.description, b.id, b.active, b.created_date, b.pretty_id, b.object_type, b.version
 		*/
-		err := rows.Scan(&object.Id, &object.ObjectType, &object.Version)
+		err := rows.Scan(&object.Name, &object.Description, &object.Id, &object.Active, &object.CreatedDate, &object.Alias, &object.ObjectType, &object.Version)
 		if err != nil {
 			return nil, micro.NewException(structs2.DatabaseError, err)
 		}

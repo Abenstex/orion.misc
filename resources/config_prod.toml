@@ -65,6 +65,8 @@ SetAttributeValueAction = true
 DeleteAttributeDefinitionAction = true
 SaveParametersAction = true
 DeleteParameterAction = true
+GetObjectsPerCategoryAction = false
+SaveObjectCategoryReferenceAction = true
 
 [metrics]
 [metrics.SaveStatesAction]
@@ -79,3 +81,9 @@ maxSize = 3
 [metrics.DeleteParameterAction]
 monitor = true
 maxSize = 1
+[metrics.GetObjectsPerCategoryAction]
+monitor = true
+maxSize = 3
+[metrics.SaveObjectCategoryReferenceAction]
+monitor = true
+maxSize = 2
