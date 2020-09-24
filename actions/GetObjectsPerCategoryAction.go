@@ -34,7 +34,7 @@ func (action *GetObjectsPerCategoryAction) BeforeAction(ctx context.Context, req
 	if err != nil {
 		return micro.NewException(structs2.UnmarshalError, err)
 	}
-	if dummy.CategoryId == nil {
+	if dummy.CategoryId == nil || *dummy.CategoryId < 0 {
 		return micro.NewException(structs2.MissingParameterError, fmt.Errorf("the parameter categoryId is missing in the request"))
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, action, true)
