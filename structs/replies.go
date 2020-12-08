@@ -249,3 +249,30 @@ func (reply GetObjectsPerCategoriesReply) Error() string {
 func (reply GetObjectsPerCategoriesReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type GetObjectTypeCustomizationsReply struct {
+	Header                   micro.ReplyHeader         `json:"header"`
+	ObjectTypeCustomizations []ObjectTypeCustomization `json:"objectTypeCustomizations"`
+}
+
+func (reply GetObjectTypeCustomizationsReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetObjectTypeCustomizationsReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetObjectTypeCustomizationsReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetObjectTypeCustomizationsReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}

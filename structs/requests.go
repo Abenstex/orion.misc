@@ -568,3 +568,65 @@ func (request *SaveObjectCategoryReferenceRequest) HandleResult(reply micro.IRep
 func (request SaveObjectCategoryReferenceRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
+
+type SaveObjectTypeCustomizationsRequest struct {
+	Header                   micro.RequestHeader       `json:"header"`
+	ObjectTypeCustomizations []ObjectTypeCustomization `json:"objectTypeCustomizations"`
+}
+
+func (request *SaveObjectTypeCustomizationsRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request SaveObjectTypeCustomizationsRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *SaveObjectTypeCustomizationsRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request SaveObjectTypeCustomizationsRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}
+
+type GetObjectTypeCustomizationsRequest struct {
+	Header      micro.RequestHeader `json:"header"`
+	WhereClause *string             `json:"whereClause"`
+}
+
+func (request *GetObjectTypeCustomizationsRequest) UpdateHeader(header *micro.RequestHeader) {
+	request.Header = *header
+}
+
+func (request GetObjectTypeCustomizationsRequest) ToString() (string, error) {
+	byteWurst, err := json.Marshal(request)
+
+	return string(byteWurst), err
+}
+
+func (request *GetObjectTypeCustomizationsRequest) HandleResult(reply micro.IReply) micro.IRequest {
+	header := request.Header
+	header.WasExecutedSuccessfully = reply.Successful()
+	if len(reply.Error()) > 0 {
+		error := reply.Error()
+		header.ExecutionError = &error
+	}
+	request.Header = header
+
+	return request
+}
+
+func (request GetObjectTypeCustomizationsRequest) GetHeader() *micro.RequestHeader {
+	return &request.Header
+}

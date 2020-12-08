@@ -81,15 +81,20 @@ func main() {
 	deleteCategoryAction.InitBaseAction(baseAction)
 	getObjectsPerCategoryAction := actions.GetObjectsPerCategoryAction{MetricsStore: metricsStore}
 	getObjectsPerCategoryAction.InitBaseAction(baseAction)
-	saveCategorieReferencesAction := actions.SaveObjectCategoryReferenceAction{MetricsStore: metricsStore}
-	saveCategorieReferencesAction.InitBaseAction(baseAction)
+	saveCategoriesReferencesAction := actions.SaveObjectCategoryReferenceAction{MetricsStore: metricsStore}
+	saveCategoriesReferencesAction.InitBaseAction(baseAction)
+	saveObjectTypeCustomizationsAction := actions.SaveObjectTypeCustomizationAction{MetricsStore: metricsStore}
+	saveObjectTypeCustomizationsAction.InitBaseAction(baseAction)
+	getObjectTypeCustomizationsAction := actions.GetObjectTypeCustomizationsAction{MetricsStore: metricsStore}
+	getObjectTypeCustomizationsAction.InitBaseAction(baseAction)
 
 	services := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
 		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
 		&getAttributeValuesAction, &getAttributeChangeHistoryAction, &saveHierarchiesAction,
 		&deleteHierarchyAction, &getHierarchiesAction, &saveParametersAction, &deleteParameterAction,
 		&getParametersAction, &saveCategoriesAction, &getCategoriesAction, &deleteCategoryAction,
-		&saveCategorieReferencesAction, &getObjectsPerCategoryAction}
+		&saveCategoriesReferencesAction, &getObjectsPerCategoryAction, &saveObjectTypeCustomizationsAction,
+		&getObjectTypeCustomizationsAction}
 
 	_ = app.StartApplication(services)
 	err = app.RegisterApplication()

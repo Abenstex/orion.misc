@@ -1,6 +1,9 @@
 package structs
 
-import "orion.commons/structs"
+import (
+	"laniakea/dataStructures"
+	"orion.commons/structs"
+)
 
 type State struct {
 	Info            structs.BaseInfo `json:"info"`
@@ -57,4 +60,15 @@ type CategoryReference struct {
 	ObjectId      uint64 `json:"objectId"`
 	ObjectType    string `json:"objectType"`
 	ObjectVersion int    `json:"objectVersion"`
+}
+
+type ObjectTypeCustomization struct {
+	Id                dataStructures.JsonNullInt64  `json:"id"`
+	ObjectType        string                        `json:"objectType"`
+	FieldName         string                        `json:"fieldName"`
+	FielDataType      string                        `json:"fieldDataType"`
+	FieldMandatory    bool                          `json:"fieldMandatory"`
+	FieldDefaultValue dataStructures.JsonNullString `json:"fieldDefaultValue"`
+	CreatedDate       int64                         `json:"createdDate"`
+	CreatedBy         dataStructures.JsonNullString `json:"createdBy"`
 }

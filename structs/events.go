@@ -147,3 +147,19 @@ func (event CategoryReferencesSavedEvent) ToJsonString() (string, error) {
 func (event CategoryReferencesSavedEvent) GetHeader() micro.EventHeader {
 	return event.Header
 }
+
+type ObjectTypeCustomizationsSavedEvent struct {
+	Header                   micro.EventHeader `json:"eventHeader"`
+	ObjectTypeCustomizations []int64           `json:"objectTypeCustomizations"`
+	ObjectType               string            `json:"objectType"`
+}
+
+func (event ObjectTypeCustomizationsSavedEvent) ToJsonString() (string, error) {
+	byteWurst, err := json.Marshal(event)
+
+	return string(byteWurst), err
+}
+
+func (event ObjectTypeCustomizationsSavedEvent) GetHeader() micro.EventHeader {
+	return event.Header
+}
