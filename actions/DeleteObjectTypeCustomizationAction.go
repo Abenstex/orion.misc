@@ -75,7 +75,7 @@ func (action DeleteObjectTypeCustomizationAction) SendEvents(request micro.IRequ
 		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), delRequest.Header.SenderId, ""),
 		ObjectId:   delRequest.ObjectId,
 		ObjectType: "OBJECT_TYPE_CUSTOMIZATION",
-		ObjectName: nil,
+		ObjectName: "",
 	}
 
 	json, err := event.ToJsonString()

@@ -149,7 +149,7 @@ func (action *SaveObjectTypeCustomizationAction) saveObjects(customizations []st
 		"field_data_type, field_mandatory, field_default_value, " +
 		"created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id"
 	updateSql := "UPDATE object_type_customizations SET  object_type = $1, field_name = $2, " +
-		"field_data_type = $3, field_mandatory = $4, field_default_value = $5, " +
+		"field_data_type = $3, field_mandatory = $4, field_default_value = $5 " +
 		" WHERE id = $6"
 	action.savedObjects = make([]structs2.ObjectTypeCustomization, len(customizations), len(customizations))
 

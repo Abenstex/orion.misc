@@ -232,7 +232,7 @@ func (action *SaveHierarchiesAction) saveReferences(hierarchy structs.Hierarchy,
 		"ON CONFLICT ON CONSTRAINT ref_hierarchies_types_unique_constraint " +
 		"DO UPDATE SET index = $6, action_by = $7, change_date=to_timestamp($8) "
 
-	fmt.Printf("Received time: %v\n", action.receivedTime)
+	//fmt.Printf("Received time: %v\n", action.receivedTime)
 
 	for _, entry := range hierarchy.Entries {
 		err := utils2.ExecuteQueryWithTransaction(tx, insertSqlRef, hierarchy.Info.Id,
