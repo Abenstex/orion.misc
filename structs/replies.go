@@ -276,3 +276,30 @@ func (reply GetObjectTypeCustomizationsReply) Error() string {
 func (reply GetObjectTypeCustomizationsReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type GetStateTransitionRulesReply struct {
+	Header               micro.ReplyHeader     `json:"header"`
+	StateTransitionRules []StateTransitionRule `json:"stateTransitionRules"`
+}
+
+func (reply GetStateTransitionRulesReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetStateTransitionRulesReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetStateTransitionRulesReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetStateTransitionRulesReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}

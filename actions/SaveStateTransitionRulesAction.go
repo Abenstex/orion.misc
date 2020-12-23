@@ -62,7 +62,7 @@ func (action *SaveStateTransitionRulesAction) InitBaseAction(baseAction micro.Ba
 }
 
 func (action SaveStateTransitionRulesAction) SendEvents(request micro.IRequest) {
-	saveRequest := request.(*structs.SaveStatesRequest)
+	saveRequest := request.(*structs.SaveStateTransitionRulesRequest)
 	if !saveRequest.Header.WasExecutedSuccessfully {
 		logging.GetLogger("SaveStateTransitionRulesAction",
 			action.GetBaseAction().Environment,
@@ -72,14 +72,14 @@ func (action SaveStateTransitionRulesAction) SendEvents(request micro.IRequest) 
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
-	ids := make([]int64, 0, len(saveRequest.UpdatedStates))
-	for _, state := range saveRequest.UpdatedStates {
+	ids := make([]int64, 0, len(saveRequest.UpdatedStateTransitionRules))
+	for _, state := range saveRequest.UpdatedStateTransitionRules {
 		ids = append(ids, state.Info.Id)
 	}
 	event := structs.SavedStateTransitionRulesEvent{
 		Header:               *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		StateTransitionRules: action.savedStateTransitionRules,
-		ObjectType:           "STATETRANSITIONRULE",
+		ObjectType:           "STATE_TRANSITION_RULE",
 	}
 
 	json, err := event.ToJsonString()
@@ -176,7 +176,7 @@ func (action *SaveStateTransitionRulesAction) saveStateTransitionRules(updatedRu
 			}
 		} else {
 			err = utils2.ExecuteInsertWithTransaction(txn, "state_transition_rules", insertColumns, rule.Info.Name, rule.Info.Description,
-				rule.Info.Active, user, rule.Info.Alias, "STATETRANSITIONRULE", rule.FromState, pq.Array(rule.ToStates))
+				rule.Info.Active, user, rule.Info.Alias, "STATE_TRANSITION_RULE", rule.FromState, pq.Array(rule.ToStates))
 			if err != nil {
 				txn.Rollback()
 				return err

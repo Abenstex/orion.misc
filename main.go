@@ -87,6 +87,10 @@ func main() {
 	saveObjectTypeCustomizationsAction.InitBaseAction(baseAction)
 	getObjectTypeCustomizationsAction := actions.GetObjectTypeCustomizationsAction{MetricsStore: metricsStore}
 	getObjectTypeCustomizationsAction.InitBaseAction(baseAction)
+	saveStateTransitionRulesAction := actions.SaveStateTransitionRulesAction{MetricsStore: metricsStore}
+	saveStateTransitionRulesAction.InitBaseAction(baseAction)
+	getStateTransitionRulesAction := actions.GetStateTransitionRulesAction{MetricsStore: metricsStore}
+	getStateTransitionRulesAction.InitBaseAction(baseAction)
 
 	services := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
 		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
@@ -94,7 +98,7 @@ func main() {
 		&deleteHierarchyAction, &getHierarchiesAction, &saveParametersAction, &deleteParameterAction,
 		&getParametersAction, &saveCategoriesAction, &getCategoriesAction, &deleteCategoryAction,
 		&saveCategoriesReferencesAction, &getObjectsPerCategoryAction, &saveObjectTypeCustomizationsAction,
-		&getObjectTypeCustomizationsAction}
+		&getObjectTypeCustomizationsAction, &saveStateTransitionRulesAction, &getStateTransitionRulesAction}
 
 	_ = app.StartApplication(services)
 	err = app.RegisterApplication()
