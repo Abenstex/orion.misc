@@ -6,9 +6,6 @@ on:
 jobs:
 
   release-linux-amd64:
-    - name: Granting private modules access
-        run: |
-          git config --global url."https://${{ secrets.GO_MODULES_TOKEN }}:x-oauth-basic@github.com/abenstex".insteadOf "https://github.com/abenstex"
     name: release linux/amd64
       runs-on: ubuntu-latest
       steps:
@@ -19,3 +16,4 @@ jobs:
             goos: linux
             goarch: arm
             release_tag: v0.0.1
+            pre_command: git config --global url."https://${{ secrets.GO_MODULES_TOKEN }}:x-oauth-basic@github.com/abenstex".insteadOf "https://github.com/abenstex"
