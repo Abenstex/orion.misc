@@ -15,4 +15,4 @@ jobs:
           goos: linux
           goarch: arm
           release_tag: v0.0.1
-          pre_command: go env -w GOSUMDB=off;GONOSUMDB=github.com/abenstex/laniakea/go.mod;GOPRIVATE=https://github.com/abenstex/ | git config --global url."https://abenstex:3117e262174f1d4a6381a0c5e2e46ecd3917e113@github.com".insteadOf "https://github.com"
+          pre_command: git config --global url."https://abenstex:3117e262174f1d4a6381a0c5e2e46ecd3917e113@github.com".insteadOf "https://github.com" | go env -w GOSUMDB=off;GONOSUMDB=github.com/abenstex/laniakea/go.mod;GOPRIVATE=https://github.com/abenstex/
