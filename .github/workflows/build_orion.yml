@@ -15,7 +15,7 @@ jobs:
             from_secret: abenstex
           ACCESS_TOKEN:
             from_secret: 3117e262174f1d4a6381a0c5e2e46ecd3917e113
-        commands:
+        run:
           - go env -w GOPRIVATE=github.com/$USERNAME
           - git config --global url."https://$USERNAME:$ACCESS_TOKEN@github.com".insteadOf "https://github.com"
       - name: Checkout
