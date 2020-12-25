@@ -3,14 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"laniakea/logging"
-	"laniakea/micro"
-	laniakeautils "laniakea/utils"
+	"github.com/abenstex/laniakea/logging"
+	"github.com/abenstex/laniakea/micro"
+	laniakeautils "github.com/abenstex/laniakea/utils"
 	"syscall"
 	"time"
 
+	"github.com/abenstex/orion.commons/utils"
 	"github.com/ztrue/shutdown"
-	"orion.commons/utils"
 	"orion.misc/actions"
 )
 
@@ -101,6 +101,7 @@ func main() {
 		&getObjectTypeCustomizationsAction, &saveStateTransitionRulesAction, &getStateTransitionRulesAction}
 
 	_ = app.StartApplication(services)
+	app.WriteApplicationInfoFile()
 	err = app.RegisterApplication()
 	if err != nil {
 		fmt.Printf("An error occurred during registration: %v\nShutting down...\n", err)

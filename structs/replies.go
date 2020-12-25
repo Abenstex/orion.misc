@@ -2,9 +2,9 @@ package structs
 
 import (
 	"encoding/json"
-	"laniakea/micro"
-	"orion.commons/couchdb"
-	"orion.commons/structs"
+	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/orion.commons/couchdb"
+	"github.com/abenstex/orion.commons/structs"
 )
 
 type GetStatesReply struct {

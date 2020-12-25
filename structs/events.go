@@ -2,8 +2,8 @@ package structs
 
 import (
 	"encoding/json"
-	"laniakea/micro"
-	"orion.commons/structs"
+	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/orion.commons/structs"
 )
 
 type SavedStatesEvent struct {

@@ -4,20 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	structs "laniakea/cache"
-	"laniakea/dataStructures"
-	"laniakea/logging"
-	"laniakea/micro"
-	"laniakea/utils"
+	structs "github.com/abenstex/laniakea/cache"
+	"github.com/abenstex/laniakea/dataStructures"
+	"github.com/abenstex/laniakea/logging"
+	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/utils"
 	"os"
 	"strconv"
 	"time"
 
+	app2 "github.com/abenstex/orion.commons/app"
+	"github.com/abenstex/orion.commons/couchdb"
+	"github.com/abenstex/orion.commons/http"
+	common_utils "github.com/abenstex/orion.commons/utils"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/spf13/viper"
-	app2 "orion.commons/app"
-	"orion.commons/couchdb"
-	"orion.commons/http"
 )
 
 const ApplicationName = "ORION.Misc"
@@ -32,6 +33,14 @@ type MiscApp struct {
 	topicActions map[string]micro.Action
 	timer        *time.Timer
 	Token        *string
+}
+
+func (app *MiscApp) WriteApplicationInfoFile() {
+	err := common_utils.WriteAppInfoFile(ApplicationName, ApplicationVersion)
+	if err != nil {
+		logger := logging.GetLogger(ApplicationName, app.Environment, true)
+		logger.WithError(err).Fatal("Could not write application information!")
+	}
 }
 
 func (app *MiscApp) Init(configPath string) (utils.Environment, error) {

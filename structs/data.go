@@ -1,8 +1,8 @@
 package structs
 
 import (
-	"laniakea/dataStructures"
-	"orion.commons/structs"
+	"github.com/abenstex/laniakea/dataStructures"
+	"github.com/abenstex/orion.commons/structs"
 )
 
 type State struct {
