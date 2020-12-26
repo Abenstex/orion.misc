@@ -11,6 +11,7 @@ import (
 	"github.com/abenstex/laniakea/utils"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	app2 "github.com/abenstex/orion.commons/app"
@@ -36,7 +37,7 @@ type MiscApp struct {
 }
 
 func (app *MiscApp) WriteApplicationInfoFile() {
-	err := common_utils.WriteAppInfoFile(ApplicationName, ApplicationVersion)
+	err := common_utils.WriteAppInfoFile(strings.ToLower(ApplicationName), ApplicationVersion)
 	if err != nil {
 		logger := logging.GetLogger(ApplicationName, app.Environment, true)
 		logger.WithError(err).Fatal("Could not write application information!")
