@@ -72,3 +72,12 @@ type ObjectTypeCustomization struct {
 	CreatedDate       int64                         `json:"createdDate"`
 	CreatedBy         dataStructures.JsonNullString `json:"createdBy"`
 }
+
+type ModuleInstallationInfo struct {
+	ModuleName         string                        `json:"moduleName"`
+	Version            string                        `json:"version"`
+	InstallationDate   int64                         `json:"installationDate"`
+	InstalledBy        dataStructures.JsonNullString `json:"installedBy"`
+	InstallationServer string                        `json:"installationServer"`
+	Readme             dataStructures.JsonNullString `json:"readme"`
+}

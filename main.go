@@ -91,6 +91,8 @@ func main() {
 	saveStateTransitionRulesAction.InitBaseAction(baseAction)
 	getStateTransitionRulesAction := actions.GetStateTransitionRulesAction{MetricsStore: metricsStore}
 	getStateTransitionRulesAction.InitBaseAction(baseAction)
+	getModuleReadmesAction := actions.GetModuleReadmesAction{MetricsStore: metricsStore}
+	getModuleReadmesAction.InitBaseAction(baseAction)
 
 	services := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
 		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
@@ -98,7 +100,8 @@ func main() {
 		&deleteHierarchyAction, &getHierarchiesAction, &saveParametersAction, &deleteParameterAction,
 		&getParametersAction, &saveCategoriesAction, &getCategoriesAction, &deleteCategoryAction,
 		&saveCategoriesReferencesAction, &getObjectsPerCategoryAction, &saveObjectTypeCustomizationsAction,
-		&getObjectTypeCustomizationsAction, &saveStateTransitionRulesAction, &getStateTransitionRulesAction}
+		&getObjectTypeCustomizationsAction, &saveStateTransitionRulesAction, &getStateTransitionRulesAction,
+		&getModuleReadmesAction}
 
 	_ = app.StartApplication(services)
 	app.WriteApplicationInfoFile()

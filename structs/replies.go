@@ -303,3 +303,30 @@ func (reply GetStateTransitionRulesReply) Error() string {
 func (reply GetStateTransitionRulesReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
+
+type GetModuleReadmesReply struct {
+	Header                  micro.ReplyHeader        `json:"header"`
+	ModuleInstallationInfos []ModuleInstallationInfo `json:"moduleInstallationInfos"`
+}
+
+func (reply GetModuleReadmesReply) MarshalJSON() (string, error) {
+	bytes, err := json.Marshal(reply)
+
+	return string(bytes), err
+}
+
+func (reply GetModuleReadmesReply) Successful() bool {
+	return reply.Header.Success
+}
+
+func (reply GetModuleReadmesReply) Error() string {
+	if reply.Header.ErrorMessage != nil {
+		return *reply.Header.ErrorMessage
+	}
+
+	return ""
+}
+
+func (reply GetModuleReadmesReply) GetHeader() *micro.ReplyHeader {
+	return &reply.Header
+}
