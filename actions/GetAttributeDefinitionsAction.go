@@ -5,26 +5,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
-	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/lib/pq"
-	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"net/http"
 	"orion.misc/structs"
 	"time"
 )
-
-const SqlGetAllAttributeDefinitions = "SELECT id, name, description, active, " +
-	"(extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, b.action_by, datatype, overwriteable, " +
-	"allowed_object_types, list_of_values, numeric_from, numeric_to, query, default_value, assign_during_object_creation " +
-	"FROM attributes a left outer join cache b on a.id=b.object_id "
 
 type GetAttributeDefinitionsAction struct {
 	baseAction   micro.BaseAction
@@ -72,7 +64,7 @@ func (action GetAttributeDefinitionsAction) SendEvents(request micro.IRequest) {
 
 func (action GetAttributeDefinitionsAction) ProvideInformation() micro.ActionInformation {
 	var reply = "orion/server/misc/reply/attributedefinition/get"
-	var error = "orion/server/misc/error/attributedefinition/get"
+	var errorTopic = "orion/server/misc/error/attributedefinition/get"
 	var requestSample = dataStructures.StructToJsonString(structs.GetAttributeDefinitionsRequest{})
 	var replySample = dataStructures.StructToJsonString(structs.GetAttributeDefinitionsReply{})
 	info := micro.ActionInformation{
@@ -80,7 +72,7 @@ func (action GetAttributeDefinitionsAction) ProvideInformation() micro.ActionInf
 		Description:    "Get attribute definitions based on conditions or all if no conditions were sent in the request",
 		RequestPath:    "orion/server/misc/request/attributedefinition/get",
 		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
+		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: errorTopic, Valid: true}},
 		Version:        1,
 		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.baseAction.ID.String(), Valid: true}},
 		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
@@ -97,7 +89,7 @@ func (action *GetAttributeDefinitionsAction) HandleWebRequest(writer http.Respon
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action GetAttributeDefinitionsAction) createGetAttributeDefinitionsReply(definitions []structs2.AttributeDefinition) (structs.GetAttributeDefinitionsReply, *micro.Exception) {
+func (action GetAttributeDefinitionsAction) createGetAttributeDefinitionsReply(definitions []structs2.AttributeDefinition) (structs.GetAttributeDefinitionsReply, *structs2.OrionError) {
 	var reply = structs.GetAttributeDefinitionsReply{}
 	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
@@ -112,7 +104,7 @@ func (action GetAttributeDefinitionsAction) createGetAttributeDefinitionsReply(d
 
 	err := errors.New(errorMsg)
 
-	return reply, micro.NewException(structs2.NoDataFound, err)
+	return reply, structs2.NewOrionError(structs2.NoDataFound, err)
 }
 
 func (action GetAttributeDefinitionsAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
@@ -127,41 +119,17 @@ func (action GetAttributeDefinitionsAction) HeyHo(ctx context.Context, request [
 			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
 	}
 
-	reply, myErr := action.getAttributeDefinitions(receivedRequest)
+	reply, myErr := action.getAttributeDefinitions(ctx, receivedRequest)
 	if myErr != nil {
-		return structs2.NewErrorReplyHeaderWithException(myErr,
+		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
 			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
 	}
 
 	return reply, &receivedRequest
 }
 
-func (action GetAttributeDefinitionsAction) fillAttributeDefinitions(rows *sql.Rows) ([]structs2.AttributeDefinition, *micro.Exception) {
-	var attributes []structs2.AttributeDefinition
-
-	for rows.Next() {
-		var attribute structs2.AttributeDefinition
-		/*
-			id, name, description, active, " +
-			"(extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, b.action_by, datatype, overwriteable, " +
-			"allowed_object_types, list_of_values, numeric_from, numeric_to, query, default_value, assign_during_object_creation
-		*/
-		err := rows.Scan(&attribute.Info.Id, &attribute.Info.Name, &attribute.Info.Description, &attribute.Info.Active,
-			&attribute.Info.CreatedDate, &attribute.Info.Alias, &attribute.Info.LockedBy, &attribute.DataType,
-			&attribute.Overwriteable, pq.Array(&attribute.AllowedObjectTypes), pq.Array(&attribute.ListOfValues),
-			&attribute.NumericFrom, &attribute.NumericTo, &attribute.Query, &attribute.DefaultValue, &attribute.AssignDuringObjectCreation)
-		if err != nil {
-			return nil, micro.NewException(structs2.DatabaseError, err)
-		}
-
-		attributes = append(attributes, attribute)
-	}
-	//fmt.Sprintf("Size of attributes: %d", len(attributes))
-	return attributes, nil
-}
-
-func (action GetAttributeDefinitionsAction) getAttributeDefinitions(request structs.GetAttributeDefinitionsRequest) (structs.GetAttributeDefinitionsReply, *micro.Exception) {
-	attributes, myErr := action.getAttributeDefinitionsFromDb(request)
+func (action GetAttributeDefinitionsAction) getAttributeDefinitions(ctx context.Context, request structs.GetAttributeDefinitionsRequest) (structs.GetAttributeDefinitionsReply, *structs2.OrionError) {
+	attributes, myErr := action.getAttributeDefinitionsFromDb(ctx, request)
 
 	if myErr != nil {
 		return structs.GetAttributeDefinitionsReply{}, myErr
@@ -170,30 +138,15 @@ func (action GetAttributeDefinitionsAction) getAttributeDefinitions(request stru
 	return action.createGetAttributeDefinitionsReply(attributes)
 }
 
-func (action GetAttributeDefinitionsAction) getAttributeDefinitionsFromDb(request structs.GetAttributeDefinitionsRequest) ([]structs2.AttributeDefinition, *micro.Exception) {
-	var sql = SqlGetAllAttributeDefinitions
-
-	if request.WhereClause != nil && len(*request.WhereClause) > 1 {
-		sql += " WHERE " + *request.WhereClause
-	}
-	logger := logging.GetLogger("GetAttributeDefinitionsAction", action.GetBaseAction().Environment, false)
-	logger.WithFields(logrus.Fields{
-		"query": sql,
-	}).Debug("Issuing GetAttributeDefinitionsAction query")
-
-	rows, err := action.GetBaseAction().Environment.Database.Query(sql)
+func (action GetAttributeDefinitionsAction) getAttributeDefinitionsFromDb(ctx context.Context, request structs.GetAttributeDefinitionsRequest) ([]structs2.AttributeDefinition, *structs2.OrionError) {
+	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("attribute_definitions").Find(ctx, bson.M{})
 	if err != nil {
-		return nil, micro.NewException(structs2.DatabaseError, err)
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	defer rows.Close()
-	states, myErr := action.fillAttributeDefinitions(rows)
-	if myErr != nil {
-		return states, myErr
+	var objects []structs2.AttributeDefinition
+	if err = cursor.All(ctx, &objects); err != nil {
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	err = rows.Err()
-	if err != nil {
-		fmt.Errorf("error code: %v - %v", structs2.DatabaseError, err)
-		return nil, micro.NewException(structs2.DatabaseError, err)
-	}
-	return states, nil
+
+	return objects, nil
 }

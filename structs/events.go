@@ -7,9 +7,9 @@ import (
 )
 
 type SavedStatesEvent struct {
-	Header     micro.EventHeader `json:"eventHeader"`
-	ObjectType string            `json:"objectType"`
-	States     []State           `json:"states"`
+	Header     micro.EventHeader `json:"event_header"`
+	ObjectType string            `json:"object_type"`
+	States     []structs.State   `json:"states"`
 }
 
 func (event SavedStatesEvent) ToJsonString() (string, error) {
@@ -23,9 +23,9 @@ func (event SavedStatesEvent) GetHeader() micro.EventHeader {
 }
 
 type SavedStateTransitionRulesEvent struct {
-	Header               micro.EventHeader     `json:"eventHeader"`
-	ObjectType           string                `json:"objectType"`
-	StateTransitionRules []StateTransitionRule `json:"stateTransitionRules"`
+	Header               micro.EventHeader     `json:"event_header"`
+	ObjectType           string                `json:"object_type"`
+	StateTransitionRules []StateTransitionRule `json:"state_transition_rules"`
 }
 
 func (event SavedStateTransitionRulesEvent) ToJsonString() (string, error) {
@@ -39,9 +39,9 @@ func (event SavedStateTransitionRulesEvent) GetHeader() micro.EventHeader {
 }
 
 type AttributeDefinitionSavedEvent struct {
-	Header               micro.EventHeader             `json:"eventHeader"`
-	ObjectType           string                        `json:"objectType"`
-	AttributeDefinitions []structs.AttributeDefinition `json:"attributeDefinitions"`
+	Header               micro.EventHeader             `json:"event_header"`
+	ObjectType           string                        `json:"object_type"`
+	AttributeDefinitions []structs.AttributeDefinition `json:"attribute_definitions"`
 }
 
 func (event AttributeDefinitionSavedEvent) ToJsonString() (string, error) {
@@ -55,8 +55,8 @@ func (event AttributeDefinitionSavedEvent) GetHeader() micro.EventHeader {
 }
 
 type AttributeValueChangedEvent struct {
-	Header           micro.EventHeader `json:"eventHeader"`
-	AttributeChanges []AttributeChange `json:"attributeChange"`
+	Header           micro.EventHeader `json:"event_header"`
+	AttributeChanges []AttributeChange `json:"attribute_change"`
 }
 
 func (event AttributeValueChangedEvent) ToJsonString() (string, error) {
@@ -70,9 +70,9 @@ func (event AttributeValueChangedEvent) GetHeader() micro.EventHeader {
 }
 
 type AttributeValueDeletedEvent struct {
-	Header      micro.EventHeader `json:"eventHeader"`
-	AttributeId uint64            `json:"attributeId"`
-	ObjectId    uint64            `json:"objectId"`
+	Header      micro.EventHeader `json:"event_header"`
+	AttributeId uint64            `json:"attribute_id"`
+	ObjectId    uint64            `json:"object_id"`
 }
 
 func (event AttributeValueDeletedEvent) ToJsonString() (string, error) {
@@ -86,8 +86,8 @@ func (event AttributeValueDeletedEvent) GetHeader() micro.EventHeader {
 }
 
 type SavedHierarchiesEvent struct {
-	Header      micro.EventHeader `json:"eventHeader"`
-	ObjectType  string            `json:"objectType"`
+	Header      micro.EventHeader `json:"event_header"`
+	ObjectType  string            `json:"object_type"`
 	Hierarchies []Hierarchy       `json:"hierarchies"`
 }
 
@@ -102,8 +102,8 @@ func (event SavedHierarchiesEvent) GetHeader() micro.EventHeader {
 }
 
 type ParameterSavedEvent struct {
-	Header     micro.EventHeader `json:"eventHeader"`
-	ObjectType string            `json:"objectType"`
+	Header     micro.EventHeader `json:"event_header"`
+	ObjectType string            `json:"object_type"`
 	Parameters []Parameter       `json:"parameters"`
 }
 
@@ -118,8 +118,8 @@ func (event ParameterSavedEvent) GetHeader() micro.EventHeader {
 }
 
 type CategorySavedEvent struct {
-	Header     micro.EventHeader `json:"eventHeader"`
-	ObjectType string            `json:"objectType"`
+	Header     micro.EventHeader `json:"event_header"`
+	ObjectType string            `json:"object_type"`
 	Categories []Category        `json:"categories"`
 }
 
@@ -134,7 +134,7 @@ func (event CategorySavedEvent) GetHeader() micro.EventHeader {
 }
 
 type CategoryReferencesSavedEvent struct {
-	Header     micro.EventHeader `json:"eventHeader"`
+	Header     micro.EventHeader `json:"event_header"`
 	Categories []uint64          `json:"categories"`
 }
 
@@ -149,9 +149,9 @@ func (event CategoryReferencesSavedEvent) GetHeader() micro.EventHeader {
 }
 
 type ObjectTypeCustomizationsSavedEvent struct {
-	Header                   micro.EventHeader `json:"eventHeader"`
-	ObjectTypeCustomizations []int64           `json:"objectTypeCustomizations"`
-	ObjectType               string            `json:"objectType"`
+	Header                   micro.EventHeader `json:"event_header"`
+	ObjectTypeCustomizations []string          `json:"object_type_customizations"`
+	ObjectType               string            `json:"object_type"`
 }
 
 func (event ObjectTypeCustomizationsSavedEvent) ToJsonString() (string, error) {

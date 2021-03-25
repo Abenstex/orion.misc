@@ -5,16 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
-	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"net/http"
 	"orion.misc/structs"
 	"time"
@@ -95,7 +93,7 @@ func (action *GetStatesAction) HandleWebRequest(writer http.ResponseWriter, requ
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action GetStatesAction) createGetStatesReply(states []structs.State) (structs.GetStatesReply, *structs2.OrionError) {
+func (action GetStatesAction) createGetStatesReply(states []structs2.State) (structs.GetStatesReply, *structs2.OrionError) {
 	var reply = structs.GetStatesReply{}
 	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
@@ -125,7 +123,7 @@ func (action GetStatesAction) HeyHo(ctx context.Context, request []byte) (micro.
 			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
 	}
 
-	reply, myErr := action.getStates(receivedRequest)
+	reply, myErr := action.getStates(ctx, receivedRequest)
 	if myErr != nil {
 		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
 			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
@@ -134,30 +132,8 @@ func (action GetStatesAction) HeyHo(ctx context.Context, request []byte) (micro.
 	return reply, &receivedRequest
 }
 
-func (action GetStatesAction) fillStates(rows *sql.Rows) ([]structs.State, *structs2.OrionError) {
-	var states []structs.State
-
-	for rows.Next() {
-		var state structs.State
-		/*
-			id, name, description, active, (extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, "+
-							" b.action_by, referenced_type, object_available, substate, default_state
-		*/
-		err := rows.Scan(&state.Info.Id, &state.Info.Name, &state.Info.Description, &state.Info.Active,
-			&state.Info.CreatedDate, &state.Info.Alias, &state.Info.LockedBy, &state.ReferencedType,
-			&state.ObjectAvailable, &state.Substate, &state.DefaultState)
-		if err != nil {
-			return nil, structs2.NewOrionError(structs2.DatabaseError, err)
-		}
-
-		states = append(states, state)
-	}
-	//fmt.Sprintf("Size of states: %d", len(states))
-	return states, nil
-}
-
-func (action GetStatesAction) getStates(request structs.GetStatesRequest) (structs.GetStatesReply, *structs2.OrionError) {
-	states, myErr := action.getStatesFromDb(request)
+func (action GetStatesAction) getStates(ctx context.Context, request structs.GetStatesRequest) (structs.GetStatesReply, *structs2.OrionError) {
+	states, myErr := action.getStatesFromDb(ctx, request)
 
 	if myErr != nil {
 		return structs.GetStatesReply{}, myErr
@@ -166,30 +142,15 @@ func (action GetStatesAction) getStates(request structs.GetStatesRequest) (struc
 	return action.createGetStatesReply(states)
 }
 
-func (action GetStatesAction) getStatesFromDb(request structs.GetStatesRequest) ([]structs.State, *structs2.OrionError) {
-	var sql = SqlGetAllStates
-
-	if request.WhereClause != nil && len(*request.WhereClause) > 1 {
-		sql += " WHERE " + *request.WhereClause
-	}
-	logger := logging.GetLogger("GetStatesAction", action.GetBaseAction().Environment, false)
-	logger.WithFields(logrus.Fields{
-		"query": sql,
-	}).Debug("Issuing GetStatesAction query")
-
-	rows, err := action.GetBaseAction().Environment.Database.Query(sql)
+func (action GetStatesAction) getStatesFromDb(ctx context.Context, request structs.GetStatesRequest) ([]structs2.State, *structs2.OrionError) {
+	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("states").Find(ctx, bson.M{})
 	if err != nil {
 		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	defer rows.Close()
-	states, myErr := action.fillStates(rows)
-	if myErr != nil {
-		return states, myErr
-	}
-	err = rows.Err()
-	if err != nil {
-		fmt.Errorf("error code: %v - %v", structs2.DatabaseError, err)
+	var objects []structs2.State
+	if err = cursor.All(ctx, &objects); err != nil {
 		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	return states, nil
+
+	return objects, nil
 }

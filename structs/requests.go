@@ -8,8 +8,7 @@ import (
 
 type SaveStatesRequest struct {
 	Header        micro.RequestHeader `json:"header"`
-	UpdatedStates []State             `json:"updatedStates"`
-	OriginalState []State             `json:"originalState"`
+	UpdatedStates []structs.State     `json:"updated_states"`
 }
 
 func (request *SaveStatesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -40,7 +39,7 @@ func (request SaveStatesRequest) ToString() (string, error) {
 
 type GetStatesRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetStatesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -71,7 +70,7 @@ func (request GetStatesRequest) GetHeader() *micro.RequestHeader {
 
 type SaveStateTransitionRulesRequest struct {
 	Header                      micro.RequestHeader   `json:"header"`
-	UpdatedStateTransitionRules []StateTransitionRule `json:"updatedStateTransitionRules"`
+	UpdatedStateTransitionRules []StateTransitionRule `json:"updated_state_transition_rules"`
 }
 
 func (request *SaveStateTransitionRulesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -102,8 +101,7 @@ func (request SaveStateTransitionRulesRequest) ToString() (string, error) {
 
 type DefineAttributeRequest struct {
 	Header                      micro.RequestHeader           `json:"header"`
-	UpdatedAttributeDefinitions []structs.AttributeDefinition `json:"updatedAttributeDefinitions"`
-	OriginalAttributeDefintions []structs.AttributeDefinition `json:"originalAttributeDefinition"`
+	UpdatedAttributeDefinitions []structs.AttributeDefinition `json:"updated_attribute_definitions"`
 }
 
 func (request *DefineAttributeRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -134,7 +132,7 @@ func (request DefineAttributeRequest) ToString() (string, error) {
 
 type GetAttributeDefinitionsRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetAttributeDefinitionsRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -196,8 +194,8 @@ func (request SetAttributeValueRequest) GetHeader() *micro.RequestHeader {
 
 type DeleteAttributeValueRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	AttributeId uint64              `json:"attributeId"`
-	ObjectId    uint64              `json:"objectId"`
+	AttributeId uint64              `json:"attribute_id"`
+	ObjectId    uint64              `json:"object_id"`
 }
 
 func (request *DeleteAttributeValueRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -228,8 +226,8 @@ func (request DeleteAttributeValueRequest) GetHeader() *micro.RequestHeader {
 
 type GetAttributeValuesRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	AttributeId *uint64             `json:"attributeId"`
-	ObjectId    *uint64             `json:"objectId"`
+	AttributeId *uint64             `json:"attribute_id"`
+	ObjectId    *uint64             `json:"object_id"`
 }
 
 func (request *GetAttributeValuesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -260,7 +258,7 @@ func (request GetAttributeValuesRequest) GetHeader() *micro.RequestHeader {
 
 type GetAttributeValueChangeHistoryRequest struct {
 	Header   micro.RequestHeader `json:"header"`
-	ObjectId uint64              `json:"objectId"`
+	ObjectId uint64              `json:"object_id"`
 }
 
 func (request *GetAttributeValueChangeHistoryRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -291,7 +289,7 @@ func (request GetAttributeValueChangeHistoryRequest) GetHeader() *micro.RequestH
 
 type SaveHierarchiesRequest struct {
 	Header             micro.RequestHeader `json:"header"`
-	UpdatedHierarchies []Hierarchy         `json:"updatedHierarchies"`
+	UpdatedHierarchies []Hierarchy         `json:"updated_hierarchies"`
 }
 
 func (request *SaveHierarchiesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -322,7 +320,7 @@ func (request SaveHierarchiesRequest) ToString() (string, error) {
 
 type GetHierarchiesRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetHierarchiesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -353,8 +351,8 @@ func (request GetHierarchiesRequest) GetHeader() *micro.RequestHeader {
 
 type EvaluateAttributeRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	ObjectId    int64               `json:"objectId"`
-	AttributeId int64               `json:"attributeId"`
+	ObjectId    int64               `json:"object_id"`
+	AttributeId int64               `json:"attribute_id"`
 }
 
 func (request *EvaluateAttributeRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -416,7 +414,7 @@ func (request SaveParametersRequest) ToString() (string, error) {
 
 type GetParametersRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetParametersRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -447,7 +445,7 @@ func (request GetParametersRequest) GetHeader() *micro.RequestHeader {
 
 type GetModuleReadmesRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetModuleReadmesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -478,7 +476,7 @@ func (request GetModuleReadmesRequest) GetHeader() *micro.RequestHeader {
 
 type SaveCategoriesRequest struct {
 	Header            micro.RequestHeader `json:"header"`
-	UpdatedCategories []Category          `json:"updatedCategories"`
+	UpdatedCategories []Category          `json:"updated_categories"`
 }
 
 func (request *SaveCategoriesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -509,7 +507,7 @@ func (request SaveCategoriesRequest) ToString() (string, error) {
 
 type GetCategoriesRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetCategoriesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -540,7 +538,7 @@ func (request GetCategoriesRequest) GetHeader() *micro.RequestHeader {
 
 type GetObjectsPerCategoriesRequest struct {
 	Header     micro.RequestHeader `json:"header"`
-	CategoryId *int64              `json:"categoryId"`
+	CategoryId *int64              `json:"category_id"`
 }
 
 func (request *GetObjectsPerCategoriesRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -569,40 +567,9 @@ func (request GetObjectsPerCategoriesRequest) GetHeader() *micro.RequestHeader {
 	return &request.Header
 }
 
-type SaveObjectCategoryReferenceRequest struct {
-	Header             micro.RequestHeader `json:"header"`
-	CategoryReferences []CategoryReference `json:"categoryReferences"`
-}
-
-func (request *SaveObjectCategoryReferenceRequest) UpdateHeader(header *micro.RequestHeader) {
-	request.Header = *header
-}
-
-func (request SaveObjectCategoryReferenceRequest) ToString() (string, error) {
-	byteWurst, err := json.Marshal(request)
-
-	return string(byteWurst), err
-}
-
-func (request *SaveObjectCategoryReferenceRequest) HandleResult(reply micro.IReply) micro.IRequest {
-	header := request.Header
-	header.WasExecutedSuccessfully = reply.Successful()
-	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
-	}
-	request.Header = header
-
-	return request
-}
-
-func (request SaveObjectCategoryReferenceRequest) GetHeader() *micro.RequestHeader {
-	return &request.Header
-}
-
 type SaveObjectTypeCustomizationsRequest struct {
 	Header                   micro.RequestHeader       `json:"header"`
-	ObjectTypeCustomizations []ObjectTypeCustomization `json:"objectTypeCustomizations"`
+	ObjectTypeCustomizations []ObjectTypeCustomization `json:"object_type_customizations"`
 }
 
 func (request *SaveObjectTypeCustomizationsRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -633,7 +600,7 @@ func (request SaveObjectTypeCustomizationsRequest) GetHeader() *micro.RequestHea
 
 type GetObjectTypeCustomizationsRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetObjectTypeCustomizationsRequest) UpdateHeader(header *micro.RequestHeader) {
@@ -664,7 +631,7 @@ func (request GetObjectTypeCustomizationsRequest) GetHeader() *micro.RequestHead
 
 type GetStateTransitionRulesRequest struct {
 	Header      micro.RequestHeader `json:"header"`
-	WhereClause *string             `json:"whereClause"`
+	WhereClause *string             `json:"where_clause"`
 }
 
 func (request *GetStateTransitionRulesRequest) UpdateHeader(header *micro.RequestHeader) {

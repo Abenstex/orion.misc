@@ -5,24 +5,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
-	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"net/http"
 	"orion.misc/structs"
 	"time"
 )
-
-const SqlGetAllParameters = "SELECT id, name, description, active," +
-	" (extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, b.action_by, a.value" +
-	" FROM parameters a left outer join cache b on a.id=b.object_id "
 
 type GetParametersAction struct {
 	baseAction   micro.BaseAction
@@ -95,7 +89,7 @@ func (action *GetParametersAction) HandleWebRequest(writer http.ResponseWriter, 
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action GetParametersAction) createGetParametersReply(parameters []structs.Parameter) (structs.GetParametersReply, *micro.Exception) {
+func (action GetParametersAction) createGetParametersReply(parameters []structs.Parameter) (structs.GetParametersReply, *structs2.OrionError) {
 	var reply = structs.GetParametersReply{}
 	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
@@ -110,7 +104,7 @@ func (action GetParametersAction) createGetParametersReply(parameters []structs.
 
 	err := errors.New(errorMsg)
 
-	return reply, micro.NewException(structs2.NoDataFound, err)
+	return reply, structs2.NewOrionError(structs2.NoDataFound, err)
 }
 
 func (action GetParametersAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
@@ -125,39 +119,17 @@ func (action GetParametersAction) HeyHo(ctx context.Context, request []byte) (mi
 			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
 	}
 
-	reply, myErr := action.getParameters(receivedRequest)
+	reply, myErr := action.getParameters(ctx, receivedRequest)
 	if myErr != nil {
-		return structs2.NewErrorReplyHeaderWithException(myErr,
+		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
 			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
 	}
 
 	return reply, &receivedRequest
 }
 
-func (action GetParametersAction) fillParameters(rows *sql.Rows) ([]structs.Parameter, *micro.Exception) {
-	var parameters []structs.Parameter
-
-	for rows.Next() {
-		var attribute structs.Parameter
-		/*
-			id, name, description, active, " +
-			"(extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, b.action_by, datatype, overwriteable, " +
-			"allowed_object_types, list_of_values, numeric_from, numeric_to, query, default_value, assign_during_object_creation
-		*/
-		err := rows.Scan(&attribute.Info.Id, &attribute.Info.Name, &attribute.Info.Description, &attribute.Info.Active,
-			&attribute.Info.CreatedDate, &attribute.Info.Alias, &attribute.Info.LockedBy, &attribute.Value)
-		if err != nil {
-			return nil, micro.NewException(structs2.DatabaseError, err)
-		}
-
-		parameters = append(parameters, attribute)
-	}
-	//fmt.Sprintf("Size of parameters: %d", len(parameters))
-	return parameters, nil
-}
-
-func (action GetParametersAction) getParameters(request structs.GetParametersRequest) (structs.GetParametersReply, *micro.Exception) {
-	parameters, myErr := action.getParametersFromDb(request)
+func (action GetParametersAction) getParameters(ctx context.Context, request structs.GetParametersRequest) (structs.GetParametersReply, *structs2.OrionError) {
+	parameters, myErr := action.getParametersFromDb(ctx, request)
 
 	if myErr != nil {
 		return structs.GetParametersReply{}, myErr
@@ -166,30 +138,15 @@ func (action GetParametersAction) getParameters(request structs.GetParametersReq
 	return action.createGetParametersReply(parameters)
 }
 
-func (action GetParametersAction) getParametersFromDb(request structs.GetParametersRequest) ([]structs.Parameter, *micro.Exception) {
-	var sql = SqlGetAllParameters
-
-	if request.WhereClause != nil && len(*request.WhereClause) > 1 {
-		sql += " WHERE " + *request.WhereClause
-	}
-	logger := logging.GetLogger("GetParametersAction", action.GetBaseAction().Environment, false)
-	logger.WithFields(logrus.Fields{
-		"query": sql,
-	}).Debug("Issuing GetParametersAction query")
-
-	rows, err := action.GetBaseAction().Environment.Database.Query(sql)
+func (action GetParametersAction) getParametersFromDb(ctx context.Context, request structs.GetParametersRequest) ([]structs.Parameter, *structs2.OrionError) {
+	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("parameters").Find(ctx, bson.M{})
 	if err != nil {
-		return nil, micro.NewException(structs2.DatabaseError, err)
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	defer rows.Close()
-	parameters, myErr := action.fillParameters(rows)
-	if myErr != nil {
-		return parameters, myErr
+	var objects []structs.Parameter
+	if err = cursor.All(ctx, &objects); err != nil {
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	err = rows.Err()
-	if err != nil {
-		fmt.Errorf("error code: %v - %v", structs2.DatabaseError, err)
-		return nil, micro.NewException(structs2.DatabaseError, err)
-	}
-	return parameters, nil
+
+	return objects, nil
 }

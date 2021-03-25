@@ -3,13 +3,12 @@ package structs
 import (
 	"encoding/json"
 	"github.com/abenstex/laniakea/micro"
-	"github.com/abenstex/orion.commons/couchdb"
 	"github.com/abenstex/orion.commons/structs"
 )
 
 type GetStatesReply struct {
 	Header micro.ReplyHeader `json:"header"`
-	States []State           `json:"states"`
+	States []structs.State   `json:"states"`
 }
 
 func (reply GetStatesReply) MarshalJSON() (string, error) {
@@ -36,7 +35,7 @@ func (reply GetStatesReply) GetHeader() *micro.ReplyHeader {
 
 type GetAttributeDefinitionsReply struct {
 	Header               micro.ReplyHeader             `json:"header"`
-	AttributeDefinitions []structs.AttributeDefinition `json:"attributeDefinitions"`
+	AttributeDefinitions []structs.AttributeDefinition `json:"data"`
 }
 
 func (reply GetAttributeDefinitionsReply) MarshalJSON() (string, error) {
@@ -63,7 +62,7 @@ func (reply GetAttributeDefinitionsReply) GetHeader() *micro.ReplyHeader {
 
 type GetAttributeValuesReply struct {
 	Header     micro.ReplyHeader   `json:"header"`
-	Attributes []structs.Attribute `json:"attributes"`
+	Attributes []structs.Attribute `json:"data"`
 }
 
 func (reply GetAttributeValuesReply) MarshalJSON() (string, error) {
@@ -88,36 +87,9 @@ func (reply GetAttributeValuesReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }
 
-type GetAttributeValueChangeHistoryReply struct {
-	Header            micro.ReplyHeader                         `json:"header"`
-	ChangedAttributes []couchdb.HistoricizedAttributeDataChange `json:"changedAttributes"`
-}
-
-func (reply GetAttributeValueChangeHistoryReply) MarshalJSON() (string, error) {
-	bytes, err := json.Marshal(reply)
-
-	return string(bytes), err
-}
-
-func (reply GetAttributeValueChangeHistoryReply) Successful() bool {
-	return reply.Header.Success
-}
-
-func (reply GetAttributeValueChangeHistoryReply) Error() string {
-	if reply.Header.ErrorMessage != nil {
-		return *reply.Header.ErrorMessage
-	}
-
-	return ""
-}
-
-func (reply GetAttributeValueChangeHistoryReply) GetHeader() *micro.ReplyHeader {
-	return &reply.Header
-}
-
 type GetHierarchiesReply struct {
 	Header      micro.ReplyHeader `json:"header"`
-	Hierarchies []Hierarchy       `json:"hierarchies"`
+	Hierarchies []Hierarchy       `json:"data"`
 }
 
 func (reply GetHierarchiesReply) MarshalJSON() (string, error) {
@@ -171,7 +143,7 @@ func (reply EvaluateAttributeReply) GetHeader() *micro.ReplyHeader {
 
 type GetParametersReply struct {
 	Header     micro.ReplyHeader `json:"header"`
-	Parameters []Parameter       `json:"parameters"`
+	Parameters []Parameter       `json:"data"`
 }
 
 func (reply GetParametersReply) MarshalJSON() (string, error) {
@@ -198,7 +170,7 @@ func (reply GetParametersReply) GetHeader() *micro.ReplyHeader {
 
 type GetCategoriesReply struct {
 	Header     micro.ReplyHeader `json:"header"`
-	Categories []Category        `json:"categories"`
+	Categories []Category        `json:"data"`
 }
 
 func (reply GetCategoriesReply) MarshalJSON() (string, error) {
@@ -225,7 +197,7 @@ func (reply GetCategoriesReply) GetHeader() *micro.ReplyHeader {
 
 type GetObjectsPerCategoriesReply struct {
 	Header  micro.ReplyHeader  `json:"header"`
-	Objects []structs.BaseInfo `json:"objects"`
+	Objects []structs.BaseInfo `json:"data"`
 }
 
 func (reply GetObjectsPerCategoriesReply) MarshalJSON() (string, error) {
@@ -252,7 +224,7 @@ func (reply GetObjectsPerCategoriesReply) GetHeader() *micro.ReplyHeader {
 
 type GetObjectTypeCustomizationsReply struct {
 	Header                   micro.ReplyHeader         `json:"header"`
-	ObjectTypeCustomizations []ObjectTypeCustomization `json:"objectTypeCustomizations"`
+	ObjectTypeCustomizations []ObjectTypeCustomization `json:"data"`
 }
 
 func (reply GetObjectTypeCustomizationsReply) MarshalJSON() (string, error) {
@@ -279,7 +251,7 @@ func (reply GetObjectTypeCustomizationsReply) GetHeader() *micro.ReplyHeader {
 
 type GetStateTransitionRulesReply struct {
 	Header               micro.ReplyHeader     `json:"header"`
-	StateTransitionRules []StateTransitionRule `json:"stateTransitionRules"`
+	StateTransitionRules []StateTransitionRule `json:"data"`
 }
 
 func (reply GetStateTransitionRulesReply) MarshalJSON() (string, error) {
@@ -301,32 +273,5 @@ func (reply GetStateTransitionRulesReply) Error() string {
 }
 
 func (reply GetStateTransitionRulesReply) GetHeader() *micro.ReplyHeader {
-	return &reply.Header
-}
-
-type GetModuleReadmesReply struct {
-	Header                  micro.ReplyHeader        `json:"header"`
-	ModuleInstallationInfos []ModuleInstallationInfo `json:"moduleInstallationInfos"`
-}
-
-func (reply GetModuleReadmesReply) MarshalJSON() (string, error) {
-	bytes, err := json.Marshal(reply)
-
-	return string(bytes), err
-}
-
-func (reply GetModuleReadmesReply) Successful() bool {
-	return reply.Header.Success
-}
-
-func (reply GetModuleReadmesReply) Error() string {
-	if reply.Header.ErrorMessage != nil {
-		return *reply.Header.ErrorMessage
-	}
-
-	return ""
-}
-
-func (reply GetModuleReadmesReply) GetHeader() *micro.ReplyHeader {
 	return &reply.Header
 }

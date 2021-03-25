@@ -5,24 +5,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
-	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"net/http"
 	"orion.misc/structs"
 	"time"
 )
-
-const SqlGetAllObjectTypeCustomizations = "SELECT id, object_type, field_name, field_data_type, " +
-	" (extract(epoch from created_date)::bigint)*1000 AS created_date, field_mandatory, field_default_value, created_by " +
-	" FROM object_type_customizations "
 
 type GetObjectTypeCustomizationsAction struct {
 	baseAction   micro.BaseAction
@@ -98,7 +92,7 @@ func (action *GetObjectTypeCustomizationsAction) HandleWebRequest(writer http.Re
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action GetObjectTypeCustomizationsAction) createGetObjectTypeCustomizationsReply(customizations []structs.ObjectTypeCustomization) (structs.GetObjectTypeCustomizationsReply, *micro.Exception) {
+func (action GetObjectTypeCustomizationsAction) createGetObjectTypeCustomizationsReply(customizations []structs.ObjectTypeCustomization) (structs.GetObjectTypeCustomizationsReply, *structs2.OrionError) {
 	var reply = structs.GetObjectTypeCustomizationsReply{}
 	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
@@ -113,42 +107,24 @@ func (action GetObjectTypeCustomizationsAction) createGetObjectTypeCustomization
 
 	err := errors.New(errorMsg)
 
-	return reply, micro.NewException(structs2.NoDataFound, err)
+	return reply, structs2.NewOrionError(structs2.NoDataFound, err)
 }
 
 func (action GetObjectTypeCustomizationsAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
-	reply, myErr := action.getCustomizations(action.request)
+	reply, myErr := action.getCustomizations(ctx, action.request)
 	if myErr != nil {
-		return structs2.NewErrorReplyHeaderWithException(myErr,
+		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
 			action.ProvideInformation().ErrorReplyPath.String), &action.request
 	}
 
 	return reply, &action.request
 }
 
-func (action GetObjectTypeCustomizationsAction) fillObjectTypeCustomizations(rows *sql.Rows) ([]structs.ObjectTypeCustomization, *micro.Exception) {
-	var customizations []structs.ObjectTypeCustomization
-
-	for rows.Next() {
-		var customization structs.ObjectTypeCustomization
-
-		err := rows.Scan(&customization.Id, &customization.ObjectType, &customization.FieldName, &customization.FielDataType,
-			&customization.CreatedDate, &customization.FieldMandatory, &customization.FieldDefaultValue, &customization.CreatedBy)
-		if err != nil {
-			return nil, micro.NewException(structs2.DatabaseError, err)
-		}
-
-		customizations = append(customizations, customization)
-	}
-
-	return customizations, nil
-}
-
-func (action GetObjectTypeCustomizationsAction) getCustomizations(request structs.GetObjectTypeCustomizationsRequest) (structs.GetObjectTypeCustomizationsReply, *micro.Exception) {
-	categories, myErr := action.getCustomizationsFromDb(request)
+func (action GetObjectTypeCustomizationsAction) getCustomizations(ctx context.Context, request structs.GetObjectTypeCustomizationsRequest) (structs.GetObjectTypeCustomizationsReply, *structs2.OrionError) {
+	categories, myErr := action.getCustomizationsFromDb(ctx, request)
 
 	if myErr != nil {
 		return structs.GetObjectTypeCustomizationsReply{}, myErr
@@ -157,30 +133,15 @@ func (action GetObjectTypeCustomizationsAction) getCustomizations(request struct
 	return action.createGetObjectTypeCustomizationsReply(categories)
 }
 
-func (action GetObjectTypeCustomizationsAction) getCustomizationsFromDb(request structs.GetObjectTypeCustomizationsRequest) ([]structs.ObjectTypeCustomization, *micro.Exception) {
-	var query = SqlGetAllObjectTypeCustomizations
-
-	if request.WhereClause != nil && len(*request.WhereClause) > 1 {
-		query += " WHERE " + *request.WhereClause
-	}
-	logger := logging.GetLogger("GetObjectTypeCustomizationsAction", action.GetBaseAction().Environment, false)
-	logger.WithFields(logrus.Fields{
-		"query": query,
-	}).Debug("Issuing GetObjectTypeCustomizationsAction query")
-
-	rows, err := action.GetBaseAction().Environment.Database.Query(query)
+func (action GetObjectTypeCustomizationsAction) getCustomizationsFromDb(ctx context.Context, request structs.GetObjectTypeCustomizationsRequest) ([]structs.ObjectTypeCustomization, *structs2.OrionError) {
+	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("object_type_customizations").Find(ctx, bson.M{})
 	if err != nil {
-		return nil, micro.NewException(structs2.DatabaseError, err)
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	defer rows.Close()
-	categories, myErr := action.fillObjectTypeCustomizations(rows)
-	if myErr != nil {
-		return categories, myErr
+	var objects []structs.ObjectTypeCustomization
+	if err = cursor.All(ctx, &objects); err != nil {
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	err = rows.Err()
-	if err != nil {
-		fmt.Errorf("error code: %v - %v", structs2.DatabaseError, err)
-		return nil, micro.NewException(structs2.DatabaseError, err)
-	}
-	return categories, nil
+
+	return objects, nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	laniakea "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
@@ -15,6 +16,7 @@ import (
 	"github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	structs2 "orion.misc/structs"
 	"time"
@@ -25,6 +27,7 @@ type SaveCategoriesAction struct {
 	MetricsStore *utils.MetricsStore
 	savedObjects []structs2.Category
 	saveRequest  structs2.SaveCategoriesRequest
+	startedTime  int64
 }
 
 func (action *SaveCategoriesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -75,10 +78,7 @@ func (action SaveCategoriesAction) SendEvents(request micro.IRequest) {
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
-	ids := make([]int64, 0, len(saveRequest.UpdatedCategories))
-	for _, category := range saveRequest.UpdatedCategories {
-		ids = append(ids, category.Info.Id)
-	}
+
 	event := structs2.CategorySavedEvent{
 		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		Categories: action.savedObjects,
@@ -129,16 +129,17 @@ func (action *SaveCategoriesAction) HandleWebRequest(writer http.ResponseWriter,
 func (action *SaveCategoriesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
+	action.startedTime = laniakea.GetCurrentTimeStamp()
 
 	dummy, _ := json.Marshal(action.saveRequest)
 	fmt.Printf("Request: %v\n", string(dummy))
 
-	exception := action.saveObjects(action.saveRequest.UpdatedCategories, action.saveRequest.Header.User)
+	exception := action.saveObjects(ctx, action.saveRequest.UpdatedCategories, action.saveRequest.Header.Comment, action.saveRequest.Header.User)
 	if exception != nil {
 		logging.GetLogger("SaveCategoriesAction",
 			action.GetBaseAction().Environment,
 			true).WithField("exception:", exception).Error("Data could not be saved")
-		return structs.NewErrorReplyHeaderWithException(exception,
+		return structs.NewErrorReplyHeaderWithOrionErr(exception,
 			action.ProvideInformation().ErrorReplyPath.String), &action.saveRequest
 	}
 
@@ -148,49 +149,66 @@ func (action *SaveCategoriesAction) HeyHo(ctx context.Context, request []byte) (
 	return reply, &action.saveRequest
 }
 
-func (action *SaveCategoriesAction) saveObjects(categories []structs2.Category, user string) *micro.Exception {
-	insertSql := "INSERT INTO categories (name, description, active, action_by, " +
-		"pretty_id, referenced_type, object_type) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id"
-	updateSql := "UPDATE categories SET  name = $1, description = $2, active = $3, action_by = $4, " +
-		"pretty_id = $5, referenced_type = $6, action_date=current_timestamp WHERE id = $7 "
-	action.savedObjects = make([]structs2.Category, len(categories), len(categories))
-
-	txn, err := action.GetBaseAction().Environment.Database.Begin()
+func (action *SaveCategoriesAction) archiveAndReplaceObject(ctx context.Context, object structs2.Category) error {
+	var objectToArchive structs2.Category
+	result, err := mongodb.ReplaceAndFindOneById(ctx, action.baseAction.Environment.MongoDbConnection, "categories", object.ID.Hex(), object)
 	if err != nil {
-		if txn != nil {
-			txn.Rollback()
-		}
-		return micro.NewException(structs.DatabaseError, err)
+		return err
 	}
-	for idx, category := range categories {
-		var id int64
-		if category.Info.Id <= 0 {
-			err = laniakea.ExecuteInsertWithTransactionWithAutoId(txn, insertSql, &id, category.Info.Name,
-				category.Info.Description, category.Info.Active, user,
-				category.Info.Alias, category.ReferencedType, "CATEGORY")
-			if err != nil {
-				logging.GetLogger("SaveCategoriesAction", action.GetBaseAction().Environment, true).WithError(err).Error("Could not insert category")
-				txn.Rollback()
-				return micro.NewException(structs.DatabaseError, err)
+	err = result.Decode(&objectToArchive)
+	if err != nil {
+		return err
+	}
+	objectToArchive.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+		Int64: action.startedTime,
+		Valid: true,
+	}}
+	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "categories", objectToArchive)
+
+	return err
+}
+
+func (action *SaveCategoriesAction) saveObjects(ctx context.Context, objects []structs2.Category, comment, user string) *structs.OrionError {
+	newCtx := context.WithValue(ctx, "objects", objects)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		objects := sessCtx.Value("objects").([]structs2.Category)
+		for _, object := range objects {
+			if object.Info.CreatedDate == 0 {
+				object.Info.CreatedDate = laniakea.GetCurrentTimeStamp()
 			}
-			category.Info.Id = id
-		} else {
-			err := laniakea.ExecuteQueryWithTransaction(txn, updateSql, category.Info.Name,
-				category.Info.Description, category.Info.Active, user, category.Info.Alias,
-				category.ReferencedType, category.Info.Id)
-			if err != nil {
-				logging.GetLogger("SaveCategoriesAction", action.GetBaseAction().Environment, true).WithError(err).Error("Could not update category")
-				txn.Rollback()
-				return micro.NewException(structs.DatabaseError, err)
+			if object.ID == nil || object.ID.IsZero() {
+				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "categories", object)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				object.Info.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: comment,
+					Valid:  true,
+				}}
+				object.Info.User = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: user,
+					Valid:  true,
+				}}
+				object.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+					Int64: action.startedTime,
+					Valid: true,
+				}}
+
+				err := action.archiveAndReplaceObject(sessCtx, object)
+				if err != nil {
+					return nil, err
+				}
 			}
+			action.savedObjects = append(action.savedObjects, object)
 		}
 
-		action.savedObjects[idx] = category
+		return nil, nil
 	}
-	err = txn.Commit()
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
 	if err != nil {
-		logging.GetLogger("SaveCategoriesAction", action.GetBaseAction().Environment, true).WithError(err).Error("Commit failed")
-		return micro.NewException(structs.DatabaseError, err)
+		return structs.NewOrionError(structs.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
 	}
 
 	return nil

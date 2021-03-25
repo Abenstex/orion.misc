@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	laniakea "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
@@ -14,6 +16,7 @@ import (
 	"github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	structs2 "orion.misc/structs"
 	"time"
@@ -23,6 +26,7 @@ type SaveParametersAction struct {
 	baseAction   micro.BaseAction
 	MetricsStore *utils.MetricsStore
 	savedObjects []structs2.Parameter
+	startedTime  int64
 }
 
 func (action SaveParametersAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -71,10 +75,7 @@ func (action SaveParametersAction) SendEvents(request micro.IRequest) {
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
-	ids := make([]int64, 0, len(saveRequest.Parameters))
-	for _, parameter := range saveRequest.Parameters {
-		ids = append(ids, parameter.Info.Id)
-	}
+
 	event := structs2.ParameterSavedEvent{
 		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		Parameters: action.savedObjects,
@@ -125,6 +126,7 @@ func (action *SaveParametersAction) HandleWebRequest(writer http.ResponseWriter,
 func (action *SaveParametersAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
+	action.startedTime = laniakea.GetCurrentTimeStamp()
 
 	saveRequest := structs2.SaveParametersRequest{}
 
@@ -135,13 +137,13 @@ func (action *SaveParametersAction) HeyHo(ctx context.Context, request []byte) (
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
-	exception := action.saveObjects(saveRequest.Parameters, saveRequest.Header.User)
+	exception := action.saveObjects(ctx, saveRequest.Parameters, saveRequest.Header.Comment, saveRequest.Header.User)
 	if exception != nil {
 		//fmt.Printf("Save Users error: %v\n", err)
 		logging.GetLogger("SaveParametersAction",
 			action.GetBaseAction().Environment,
 			true).WithField("exception:", exception).Error("Data could not be saved")
-		return structs.NewErrorReplyHeaderWithException(exception,
+		return structs.NewErrorReplyHeaderWithOrionErr(exception,
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
@@ -151,48 +153,66 @@ func (action *SaveParametersAction) HeyHo(ctx context.Context, request []byte) (
 	return reply, &saveRequest
 }
 
-func (action *SaveParametersAction) saveObjects(parameters []structs2.Parameter, user string) *micro.Exception {
-	insertSql := "INSERT INTO parameters (name, description, active, action_by, " +
-		"pretty_id, value, object_type) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id"
-	updateSql := "UPDATE parameters SET  name = $1, description = $2, active = $3, action_by = $4, " +
-		"pretty_id = $5, value = $6 WHERE id = $7 "
-	action.savedObjects = make([]structs2.Parameter, len(parameters), len(parameters))
-
-	txn, err := action.GetBaseAction().Environment.Database.Begin()
+func (action *SaveParametersAction) archiveAndReplaceObject(ctx context.Context, object structs2.Parameter) error {
+	var objectToArchive structs2.Parameter
+	result, err := mongodb.ReplaceAndFindOneById(ctx, action.baseAction.Environment.MongoDbConnection, "parameters", object.ID.Hex(), object)
 	if err != nil {
-		if txn != nil {
-			txn.Rollback()
-		}
-		return micro.NewException(structs.DatabaseError, err)
+		return err
 	}
-	for idx, parameter := range parameters {
-		var id int64
-		if parameter.Info.Id <= 0 {
-			err = laniakea.ExecuteInsertWithTransactionWithAutoId(txn, insertSql, &id, parameter.Info.Name,
-				parameter.Info.Description, parameter.Info.Active, user,
-				parameter.Info.Alias, parameter.Value, "PARAMETER")
-			if err != nil {
-				logging.GetLogger("SaveParametersAction", action.GetBaseAction().Environment, true).WithError(err).Error("Could not insert parameter")
-				txn.Rollback()
-				return micro.NewException(structs.DatabaseError, err)
+	err = result.Decode(&objectToArchive)
+	if err != nil {
+		return err
+	}
+	objectToArchive.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+		Int64: action.startedTime,
+		Valid: true,
+	}}
+	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "parameters", objectToArchive)
+
+	return err
+}
+
+func (action *SaveParametersAction) saveObjects(ctx context.Context, objects []structs2.Parameter, comment, user string) *structs.OrionError {
+	newCtx := context.WithValue(ctx, "objects", objects)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		objects := sessCtx.Value("objects").([]structs2.Parameter)
+		for _, object := range objects {
+			if object.Info.CreatedDate == 0 {
+				object.Info.CreatedDate = laniakea.GetCurrentTimeStamp()
 			}
-			parameter.Info.Id = id
-		} else {
-			err := laniakea.ExecuteQueryWithTransaction(txn, updateSql, parameter.Info.Name,
-				parameter.Info.Description, parameter.Info.Active, user, parameter.Info.Alias,
-				parameter.Value, parameter.Info.Id)
-			if err != nil {
-				logging.GetLogger("SaveParametersAction", action.GetBaseAction().Environment, true).WithError(err).Error("Could not update parameter")
-				txn.Rollback()
-				return micro.NewException(structs.DatabaseError, err)
+			if object.ID == nil || object.ID.IsZero() {
+				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "parameters", object)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				object.Info.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: comment,
+					Valid:  true,
+				}}
+				object.Info.User = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: user,
+					Valid:  true,
+				}}
+				object.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+					Int64: action.startedTime,
+					Valid: true,
+				}}
+
+				err := action.archiveAndReplaceObject(sessCtx, object)
+				if err != nil {
+					return nil, err
+				}
 			}
+			action.savedObjects = append(action.savedObjects, object)
 		}
 
-		action.savedObjects[idx] = parameter
+		return nil, nil
 	}
-	err = txn.Commit()
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
 	if err != nil {
-		return micro.NewException(structs.DatabaseError, err)
+		return structs.NewOrionError(structs.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
 	}
 
 	return nil

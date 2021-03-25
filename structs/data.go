@@ -3,21 +3,14 @@ package structs
 import (
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/orion.commons/structs"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type State struct {
-	Info            structs.BaseInfo `json:"info"`
-	ReferencedType  string           `json:"referencedType"`
-	ObjectAvailable bool             `json:"objectAvailable"`
-	Substate        bool             `json:"substate"`
-	DefaultState    bool             `json:"defaultState"`
-	Substates       []int64          `json:"subStates"`
-}
-
 type StateTransitionRule struct {
-	Info      structs.BaseInfo `json:"info"`
-	FromState int64            `json:"fromState"`
-	ToStates  []int64          `json:"toStates"`
+	ID        *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Info      structs.BaseInfo    `bson:"info" json:"info"`
+	FromState int64               `bson:"from_state" json:"from_state"`
+	ToStates  []int64             `bson:"to_states" json:"to_states"`
 }
 
 type AttributeChange struct {
@@ -30,8 +23,9 @@ type AttributeChange struct {
 }
 
 type Hierarchy struct {
-	Info    structs.BaseInfo `json:"info"`
-	Entries []HierarchyEntry `json:"entries"`
+	ID      *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Info    structs.BaseInfo    `bson:"info" json:"info"`
+	Entries []HierarchyEntry    `bson:"entries" json:"entries"`
 }
 
 func NewHierarchy() Hierarchy {
@@ -41,43 +35,33 @@ func NewHierarchy() Hierarchy {
 }
 
 type HierarchyEntry struct {
-	Index      int    `json:"index"`
-	ObjectType string `json:"objectType"`
+	ID         *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Index      int                 `bson:"index" json:"index"`
+	ObjectType string              `bson:"object_type" json:"object_type"`
 }
 
 type Parameter struct {
-	Info  structs.BaseInfo `json:"info"`
-	Value string           `json:"value"`
+	ID    *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Info  structs.BaseInfo    `bson:"info" json:"info"`
+	Value string              `bson:"value" json:"value"`
 }
 
 type Category struct {
-	Info           structs.BaseInfo `json:"info"`
-	ReferencedType string           `json:"referencedType"`
-}
-
-type CategoryReference struct {
-	CategoryId    uint64 `json:"categoryId"`
-	ObjectId      uint64 `json:"objectId"`
-	ObjectType    string `json:"objectType"`
-	ObjectVersion int    `json:"objectVersion"`
+	ID             *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Info           structs.BaseInfo    `bson:"info" json:"info"`
+	ReferencedType string              `bson:"referenced_type" json:"referenced_type"`
 }
 
 type ObjectTypeCustomization struct {
-	Id                dataStructures.JsonNullInt64  `json:"id"`
-	ObjectType        string                        `json:"objectType"`
-	FieldName         string                        `json:"fieldName"`
-	FielDataType      string                        `json:"fieldDataType"`
-	FieldMandatory    bool                          `json:"fieldMandatory"`
-	FieldDefaultValue dataStructures.JsonNullString `json:"fieldDefaultValue"`
-	CreatedDate       int64                         `json:"createdDate"`
-	CreatedBy         dataStructures.JsonNullString `json:"createdBy"`
-}
-
-type ModuleInstallationInfo struct {
-	ModuleName         string                        `json:"moduleName"`
-	Version            string                        `json:"version"`
-	InstallationDate   int64                         `json:"installationDate"`
-	InstalledBy        dataStructures.JsonNullString `json:"installedBy"`
-	InstallationServer string                        `json:"installationServer"`
-	Readme             dataStructures.JsonNullString `json:"readme"`
+	ID                *primitive.ObjectID           `bson:"_id,omitempty" json:"_id,omitempty"`
+	ObjectType        string                        `bson:"object_type" json:"object_type"`
+	FieldName         string                        `bson:"field_name" json:"field_name"`
+	FielDataType      string                        `bson:"field_data_type" json:"field_data_type"`
+	FieldMandatory    bool                          `bson:"is_mandatory_field" json:"is_mandatory_field"`
+	FieldDefaultValue dataStructures.JsonNullString `bson:"field_default_value" json:"field_default_value"`
+	CreatedDate       int64                         `bson:"created_date" json:"created_date"`
+	CreatedBy         dataStructures.JsonNullString `bson:"created_by" json:"created_by"`
+	UserComment       dataStructures.JsonNullString `bson:"user_comment" json:"user_comment"`
+	User              dataStructures.JsonNullString `bson:"user" json:"user"`
+	ChangeDate        dataStructures.JsonNullInt64  `bson:"change_date" json:"change_date"`
 }

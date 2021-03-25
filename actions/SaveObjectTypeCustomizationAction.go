@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	laniakea "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
@@ -14,6 +16,7 @@ import (
 	"github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	structs2 "orion.misc/structs"
 	"time"
@@ -24,6 +27,7 @@ type SaveObjectTypeCustomizationAction struct {
 	MetricsStore *utils.MetricsStore
 	savedObjects []structs2.ObjectTypeCustomization
 	saveRequest  structs2.SaveObjectTypeCustomizationsRequest
+	startedTime  int64
 }
 
 func (action *SaveObjectTypeCustomizationAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -73,9 +77,9 @@ func (action SaveObjectTypeCustomizationAction) SendEvents(request micro.IReques
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
-	ids := make([]int64, 0, len(saveRequest.ObjectTypeCustomizations))
-	for _, parameter := range saveRequest.ObjectTypeCustomizations {
-		ids = append(ids, parameter.Id.Int64)
+	ids := make([]string, 0, len(action.savedObjects))
+	for _, parameter := range action.savedObjects {
+		ids = append(ids, parameter.ID.Hex())
 	}
 	event := structs2.ObjectTypeCustomizationsSavedEvent{
 		Header:                   *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
@@ -127,14 +131,15 @@ func (action *SaveObjectTypeCustomizationAction) HandleWebRequest(writer http.Re
 func (action *SaveObjectTypeCustomizationAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
+	action.startedTime = laniakea.GetCurrentTimeStamp()
 
-	exception := action.saveObjects(action.saveRequest.ObjectTypeCustomizations, action.saveRequest.Header.User)
+	exception := action.saveObjects(ctx, action.saveRequest.ObjectTypeCustomizations, action.saveRequest.Header.Comment, action.saveRequest.Header.User)
 	if exception != nil {
 		//fmt.Printf("Save Users error: %v\n", err)
 		logging.GetLogger("SaveObjectTypeCustomizationAction",
 			action.GetBaseAction().Environment,
 			true).WithField("exception:", exception).Error("Data could not be saved")
-		return structs.NewErrorReplyHeaderWithException(exception,
+		return structs.NewErrorReplyHeaderWithOrionErr(exception,
 			action.ProvideInformation().ErrorReplyPath.String), &action.saveRequest
 	}
 
@@ -144,53 +149,66 @@ func (action *SaveObjectTypeCustomizationAction) HeyHo(ctx context.Context, requ
 	return reply, &action.saveRequest
 }
 
-func (action *SaveObjectTypeCustomizationAction) saveObjects(customizations []structs2.ObjectTypeCustomization, user string) *micro.Exception {
-	insertSql := "INSERT INTO object_type_customizations (object_type, field_name, " +
-		"field_data_type, field_mandatory, field_default_value, " +
-		"created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id"
-	updateSql := "UPDATE object_type_customizations SET  object_type = $1, field_name = $2, " +
-		"field_data_type = $3, field_mandatory = $4, field_default_value = $5 " +
-		" WHERE id = $6"
-	action.savedObjects = make([]structs2.ObjectTypeCustomization, len(customizations), len(customizations))
-
-	txn, err := action.GetBaseAction().Environment.Database.Begin()
+func (action *SaveObjectTypeCustomizationAction) archiveAndReplaceObject(ctx context.Context, object structs2.ObjectTypeCustomization) error {
+	var objectToArchive structs2.ObjectTypeCustomization
+	result, err := mongodb.ReplaceAndFindOneById(ctx, action.baseAction.Environment.MongoDbConnection, "object_type_customization", object.ID.Hex(), object)
 	if err != nil {
-		if txn != nil {
-			txn.Rollback()
-		}
-		return micro.NewException(structs.DatabaseError, err)
+		return err
 	}
-	for idx, customization := range customizations {
-		var id int64
-		if !customization.Id.Valid || customization.Id.Int64 <= 0 {
-			err = laniakea.ExecuteInsertWithTransactionWithAutoId(txn, insertSql, &id, customization.ObjectType,
-				customization.FieldName, customization.FielDataType, customization.FieldMandatory,
-				customization.FieldDefaultValue, user)
-			if err != nil {
-				logging.GetLogger("SaveObjectTypeCustomizationAction", action.GetBaseAction().Environment, true).WithError(err).Error("Could not insert customization")
-				txn.Rollback()
-				return micro.NewException(structs.DatabaseError, err)
+	err = result.Decode(&objectToArchive)
+	if err != nil {
+		return err
+	}
+	objectToArchive.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+		Int64: action.startedTime,
+		Valid: true,
+	}}
+	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "object_type_customization", objectToArchive)
+
+	return err
+}
+
+func (action *SaveObjectTypeCustomizationAction) saveObjects(ctx context.Context, objects []structs2.ObjectTypeCustomization, comment, user string) *structs.OrionError {
+	newCtx := context.WithValue(ctx, "objects", objects)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		objects := sessCtx.Value("objects").([]structs2.ObjectTypeCustomization)
+		for _, object := range objects {
+			if object.CreatedDate == 0 {
+				object.CreatedDate = laniakea.GetCurrentTimeStamp()
 			}
-			customization.Id = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
-				Int64: id,
-				Valid: true,
-			}}
-		} else {
-			err := laniakea.ExecuteQueryWithTransaction(txn, updateSql, customization.ObjectType,
-				customization.FieldName, customization.FielDataType, customization.FieldMandatory,
-				customization.FieldDefaultValue, customization.Id.Int64)
-			if err != nil {
-				logging.GetLogger("SaveParametersAction", action.GetBaseAction().Environment, true).WithError(err).Error("Could not update customization")
-				txn.Rollback()
-				return micro.NewException(structs.DatabaseError, err)
+			if object.ID == nil || object.ID.IsZero() {
+				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "object_type_customization", object)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				object.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: comment,
+					Valid:  true,
+				}}
+				object.User = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: user,
+					Valid:  true,
+				}}
+				object.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+					Int64: action.startedTime,
+					Valid: true,
+				}}
+
+				err := action.archiveAndReplaceObject(sessCtx, object)
+				if err != nil {
+					return nil, err
+				}
 			}
+			action.savedObjects = append(action.savedObjects, object)
 		}
 
-		action.savedObjects[idx] = customization
+		return nil, nil
 	}
-	err = txn.Commit()
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
 	if err != nil {
-		return micro.NewException(structs.DatabaseError, err)
+		return structs.NewOrionError(structs.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
 	}
 
 	return nil

@@ -4,18 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/lib/pq"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	"orion.misc/structs"
 	"time"
@@ -24,7 +25,8 @@ import (
 type SaveStatesAction struct {
 	baseAction   micro.BaseAction
 	MetricsStore *utils.MetricsStore
-	savedStates  []structs.State
+	savedObjects []structs2.State
+	startedTime  int64
 }
 
 func (action SaveStatesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -74,13 +76,10 @@ func (action SaveStatesAction) SendEvents(request micro.IRequest) {
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
-	ids := make([]int64, 0, len(saveRequest.UpdatedStates))
-	for _, state := range saveRequest.UpdatedStates {
-		ids = append(ids, state.Info.Id)
-	}
+
 	event := structs.SavedStatesEvent{
 		Header:     *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
-		States:     action.savedStates,
+		States:     action.savedObjects,
 		ObjectType: "STATE",
 	}
 
@@ -126,6 +125,7 @@ func (action *SaveStatesAction) HandleWebRequest(writer http.ResponseWriter, req
 func (action *SaveStatesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
+	action.startedTime = utils2.GetCurrentTimeStamp()
 
 	saveRequest := structs.SaveStatesRequest{}
 
@@ -136,12 +136,12 @@ func (action *SaveStatesAction) HeyHo(ctx context.Context, request []byte) (micr
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
-	err = action.saveStates(saveRequest.UpdatedStates, saveRequest.OriginalState, saveRequest.Header.User)
-	if err != nil {
+	orionErr := action.saveObjects(ctx, saveRequest.UpdatedStates, saveRequest.Header.Comment, saveRequest.Header.User)
+	if orionErr != nil {
 		logging.GetLogger(action.ProvideInformation().Name,
 			action.GetBaseAction().Environment,
 			true).WithError(err).Error("Data could not be saved")
-		return structs2.NewErrorReplyHeaderWithOrionErr(structs2.NewOrionError(structs2.DatabaseError, err),
+		return structs2.NewErrorReplyHeaderWithOrionErr(orionErr,
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
@@ -151,88 +151,66 @@ func (action *SaveStatesAction) HeyHo(ctx context.Context, request []byte) (micr
 	return reply, &saveRequest
 }
 
-func (action *SaveStatesAction) saveStates(updatedStates []structs.State, originalStates []structs.State, user string) error {
-	insertSql := "INSERT INTO states (name, description, active, action_by, pretty_id, " +
-		"referenced_type, object_available, substate, default_state, object_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
-	updateSql := "UPDATE states SET name = $1, description = $2, active = $3, " +
-		"pretty_id = $4, referenced_type = $5, object_available = $6, substate = $7, default_state = $8 WHERE id = $9"
-
-	action.savedStates = make([]structs.State, len(updatedStates), len(updatedStates))
-
-	txn, err := action.GetBaseAction().Environment.Database.Begin()
+func (action *SaveStatesAction) archiveAndReplaceObject(ctx context.Context, object structs2.State) error {
+	var objectToArchive structs2.State
+	result, err := mongodb.ReplaceAndFindOneById(ctx, action.baseAction.Environment.MongoDbConnection, "states", object.ID.Hex(), object)
 	if err != nil {
-		if txn != nil {
-			txn.Rollback()
-		}
 		return err
 	}
-
-	for idx, state := range updatedStates {
-		var id int64
-		if state.Info.Id <= 0 {
-			err = utils2.ExecuteInsertWithTransactionWithAutoId(txn, insertSql, &id, state.Info.Name, state.Info.Description,
-				state.Info.Active, user, state.Info.Alias, state.ReferencedType, state.ObjectAvailable, state.Substate,
-				state.DefaultState, "STATE")
-			if err != nil {
-				txn.Rollback()
-				return err
-			}
-			state.Info.Id = id
-		} else {
-			err := utils2.ExecuteQueryWithTransaction(txn, updateSql, state.Info.Name,
-				state.Info.Description, state.Info.Active, state.Info.Alias,
-				state.ReferencedType, state.ObjectAvailable, state.Substate,
-				state.DefaultState, state.Info.Id)
-			if err != nil {
-				txn.Rollback()
-				return err
-			}
-		}
-		var origProfile = action.getOriginalState(state.Info.Id, originalStates)
-		err = action.saveReferences(txn, state.Info.Id, state.Substates, origProfile.Substates, user)
-		if err != nil {
-			txn.Rollback()
-			return err
-		}
-		action.savedStates[idx] = state
+	err = result.Decode(&objectToArchive)
+	if err != nil {
+		return err
 	}
+	objectToArchive.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+		Int64: action.startedTime,
+		Valid: true,
+	}}
+	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "states", objectToArchive)
 
-	return txn.Commit()
+	return err
 }
 
-func (action *SaveStatesAction) getOriginalState(objectId int64, originalStates []structs.State) structs.State {
-	if objectId == -1 || originalStates == nil || len(originalStates) == 0 {
-		return structs.State{}
-	}
-	for _, state := range originalStates {
-		if objectId == state.Info.Id {
-			return state
-		}
-	}
+func (action *SaveStatesAction) saveObjects(ctx context.Context, objects []structs2.State, comment, user string) *structs2.OrionError {
+	newCtx := context.WithValue(ctx, "objects", objects)
 
-	return structs.State{}
-}
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		objects := sessCtx.Value("objects").([]structs2.State)
+		for _, object := range objects {
+			if object.Info.CreatedDate == 0 {
+				object.Info.CreatedDate = utils2.GetCurrentTimeStamp()
+			}
+			if object.ID == nil || object.ID.IsZero() {
+				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "states", object)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				object.Info.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: comment,
+					Valid:  true,
+				}}
+				object.Info.User = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: user,
+					Valid:  true,
+				}}
+				object.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+					Int64: action.startedTime,
+					Valid: true,
+				}}
 
-func (action SaveStatesAction) saveReferences(txn *sql.Tx, stateId int64, updatedStates []int64, originalStates []int64, user string) error {
-	compareResult := dataStructures.CompareInt64Slices(updatedStates, originalStates, true)
-	// NotInSlice1 : IDs NICHT in updatedIDs aber in origIds -> delete
-	// NotInSlice2 : IDs in updatedIDs aber NICHT in origIds -> insert
-	deleteReferenceSql := "DELETE FROM ref_states_substates WHERE state_id=$1 AND substate_id = ANY($2::bigint[]) "
-
-	if len(compareResult.NotInSlice1) > 0 {
-		logging.GetLogger(action.ProvideInformation().Name, action.GetBaseAction().Environment, false).
-			WithFields(logrus.Fields{"stateId": stateId}).Debug("Deleting updatedSubstates references for state")
-		err := utils2.ExecuteQueryWithTransaction(txn, deleteReferenceSql, stateId, pq.Array(compareResult.NotInSlice1))
-		if err != nil {
-			return err
+				err := action.archiveAndReplaceObject(sessCtx, object)
+				if err != nil {
+					return nil, err
+				}
+			}
+			action.savedObjects = append(action.savedObjects, object)
 		}
+
+		return nil, nil
 	}
-	columns := []string{"state_id", "substate_id", "action_by"}
-	for _, refId := range compareResult.NotInSlice2 {
-		err := utils2.ExecuteInsertWithTransaction(txn, "ref_states_substates", columns, stateId, refId, user)
-		if err != nil {
-			return err
-		}
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
+	if err != nil {
+		return structs2.NewOrionError(structs2.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
 	}
 
 	return nil

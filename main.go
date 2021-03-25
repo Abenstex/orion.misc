@@ -53,14 +53,6 @@ func main() {
 	deleteAttributeDefinitionAction.InitBaseAction(baseAction)
 	getAttributeDefinitionsAction := actions.GetAttributeDefinitionsAction{MetricsStore: metricsStore}
 	getAttributeDefinitionsAction.InitBaseAction(baseAction)
-	setAttributeValueAction := actions.SetAttributeValueAction{MetricsStore: metricsStore}
-	setAttributeValueAction.InitBaseAction(baseAction)
-	deleteAttributeValueAction := actions.DeleteAttributeValueAction{MetricsStore: metricsStore}
-	deleteAttributeValueAction.InitBaseAction(baseAction)
-	getAttributeValuesAction := actions.GetAttributeValuesPerObjectAction{MetricsStore: metricsStore}
-	getAttributeValuesAction.InitBaseAction(baseAction)
-	getAttributeChangeHistoryAction := actions.GetAttributeChangeHistoryAction{MetricsStore: metricsStore}
-	getAttributeChangeHistoryAction.InitBaseAction(baseAction)
 	saveHierarchiesAction := actions.SaveHierarchiesAction{MetricsStore: metricsStore}
 	saveHierarchiesAction.InitBaseAction(baseAction)
 	deleteHierarchyAction := actions.DeleteHierarchyAction{MetricsStore: metricsStore}
@@ -79,10 +71,6 @@ func main() {
 	getCategoriesAction.InitBaseAction(baseAction)
 	deleteCategoryAction := actions.DeleteCategoryAction{MetricsStore: metricsStore}
 	deleteCategoryAction.InitBaseAction(baseAction)
-	getObjectsPerCategoryAction := actions.GetObjectsPerCategoryAction{MetricsStore: metricsStore}
-	getObjectsPerCategoryAction.InitBaseAction(baseAction)
-	saveCategoriesReferencesAction := actions.SaveObjectCategoryReferenceAction{MetricsStore: metricsStore}
-	saveCategoriesReferencesAction.InitBaseAction(baseAction)
 	saveObjectTypeCustomizationsAction := actions.SaveObjectTypeCustomizationAction{MetricsStore: metricsStore}
 	saveObjectTypeCustomizationsAction.InitBaseAction(baseAction)
 	getObjectTypeCustomizationsAction := actions.GetObjectTypeCustomizationsAction{MetricsStore: metricsStore}
@@ -91,17 +79,12 @@ func main() {
 	saveStateTransitionRulesAction.InitBaseAction(baseAction)
 	getStateTransitionRulesAction := actions.GetStateTransitionRulesAction{MetricsStore: metricsStore}
 	getStateTransitionRulesAction.InitBaseAction(baseAction)
-	getModuleReadmesAction := actions.GetModuleReadmesAction{MetricsStore: metricsStore}
-	getModuleReadmesAction.InitBaseAction(baseAction)
 
 	services := []micro.Action{&saveStatesAction, &deleteStateAction, &getStatesAction, &defineAttributesAction,
-		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &setAttributeValueAction, &deleteAttributeValueAction,
-		&getAttributeValuesAction, &getAttributeChangeHistoryAction, &saveHierarchiesAction,
+		&deleteAttributeDefinitionAction, &getAttributeDefinitionsAction, &saveHierarchiesAction,
 		&deleteHierarchyAction, &getHierarchiesAction, &saveParametersAction, &deleteParameterAction,
 		&getParametersAction, &saveCategoriesAction, &getCategoriesAction, &deleteCategoryAction,
-		&saveCategoriesReferencesAction, &getObjectsPerCategoryAction, &saveObjectTypeCustomizationsAction,
-		&getObjectTypeCustomizationsAction, &saveStateTransitionRulesAction, &getStateTransitionRulesAction,
-		&getModuleReadmesAction}
+		&saveObjectTypeCustomizationsAction, &getObjectTypeCustomizationsAction, &saveStateTransitionRulesAction, &getStateTransitionRulesAction}
 
 	_ = app.StartApplication(services)
 	app.WriteApplicationInfoFile()

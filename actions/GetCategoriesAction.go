@@ -5,24 +5,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
-	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"net/http"
 	"orion.misc/structs"
 	"time"
 )
-
-const SqlGetAllCategories = "SELECT id, name, description, active," +
-	" (extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, b.action_by, a.referenced_type" +
-	" FROM categories a left outer join cache b on a.id=b.object_id "
 
 type GetCategoriesAction struct {
 	baseAction   micro.BaseAction
@@ -98,7 +92,7 @@ func (action *GetCategoriesAction) HandleWebRequest(writer http.ResponseWriter, 
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action GetCategoriesAction) createGetCategoriesReply(categories []structs.Category) (structs.GetCategoriesReply, *micro.Exception) {
+func (action GetCategoriesAction) createGetCategoriesReply(categories []structs.Category) (structs.GetCategoriesReply, *structs2.OrionError) {
 	var reply = structs.GetCategoriesReply{}
 	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
@@ -113,42 +107,24 @@ func (action GetCategoriesAction) createGetCategoriesReply(categories []structs.
 
 	err := errors.New(errorMsg)
 
-	return reply, micro.NewException(structs2.NoDataFound, err)
+	return reply, structs2.NewOrionError(structs2.NoDataFound, err)
 }
 
 func (action GetCategoriesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
-	reply, myErr := action.getCategories(action.request)
+	reply, myErr := action.getCategories(ctx, action.request)
 	if myErr != nil {
-		return structs2.NewErrorReplyHeaderWithException(myErr,
+		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
 			action.ProvideInformation().ErrorReplyPath.String), &action.request
 	}
 
 	return reply, &action.request
 }
 
-func (action GetCategoriesAction) fillCategories(rows *sql.Rows) ([]structs.Category, *micro.Exception) {
-	var categories []structs.Category
-
-	for rows.Next() {
-		var category structs.Category
-
-		err := rows.Scan(&category.Info.Id, &category.Info.Name, &category.Info.Description, &category.Info.Active,
-			&category.Info.CreatedDate, &category.Info.Alias, &category.Info.LockedBy, &category.ReferencedType)
-		if err != nil {
-			return nil, micro.NewException(structs2.DatabaseError, err)
-		}
-
-		categories = append(categories, category)
-	}
-
-	return categories, nil
-}
-
-func (action GetCategoriesAction) getCategories(request structs.GetCategoriesRequest) (structs.GetCategoriesReply, *micro.Exception) {
-	categories, myErr := action.getCategoriesFromDb(request)
+func (action GetCategoriesAction) getCategories(ctx context.Context, request structs.GetCategoriesRequest) (structs.GetCategoriesReply, *structs2.OrionError) {
+	categories, myErr := action.getCategoriesFromDb(ctx, request)
 
 	if myErr != nil {
 		return structs.GetCategoriesReply{}, myErr
@@ -157,30 +133,15 @@ func (action GetCategoriesAction) getCategories(request structs.GetCategoriesReq
 	return action.createGetCategoriesReply(categories)
 }
 
-func (action GetCategoriesAction) getCategoriesFromDb(request structs.GetCategoriesRequest) ([]structs.Category, *micro.Exception) {
-	var query = SqlGetAllCategories
-
-	if request.WhereClause != nil && len(*request.WhereClause) > 1 {
-		query += " WHERE " + *request.WhereClause
-	}
-	logger := logging.GetLogger("GetCategoriesAction", action.GetBaseAction().Environment, false)
-	logger.WithFields(logrus.Fields{
-		"query": query,
-	}).Debug("Issuing GetCategoriesAction query")
-
-	rows, err := action.GetBaseAction().Environment.Database.Query(query)
+func (action GetCategoriesAction) getCategoriesFromDb(ctx context.Context, request structs.GetCategoriesRequest) ([]structs.Category, *structs2.OrionError) {
+	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("categories").Find(ctx, bson.M{})
 	if err != nil {
-		return nil, micro.NewException(structs2.DatabaseError, err)
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	defer rows.Close()
-	categories, myErr := action.fillCategories(rows)
-	if myErr != nil {
-		return categories, myErr
+	var objects []structs.Category
+	if err = cursor.All(ctx, &objects); err != nil {
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	err = rows.Err()
-	if err != nil {
-		fmt.Errorf("error code: %v - %v", structs2.DatabaseError, err)
-		return nil, micro.NewException(structs2.DatabaseError, err)
-	}
-	return categories, nil
+
+	return objects, nil
 }

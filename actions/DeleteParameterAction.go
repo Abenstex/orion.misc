@@ -4,16 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
+	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	"github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
+	structs2 "orion.misc/structs"
 	"time"
 )
 
@@ -33,10 +38,7 @@ func (action *DeleteParameterAction) BeforeAction(ctx context.Context, request [
 	if err != nil {
 		return micro.NewException(structs.RequestHeaderInvalid, err)
 	}
-	err = action.getNameBeforeDelete(action.deleteRequest.ObjectId)
-	if err != nil {
-		return micro.NewException(structs.DatabaseError, err)
-	}
+	action.objectName = action.deleteRequest.ObjectName
 
 	return nil
 }
@@ -127,16 +129,15 @@ func (action *DeleteParameterAction) HeyHo(ctx context.Context, request []byte) 
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
-	env := action.GetBaseAction().Environment
 	err := json.Unmarshal(request, &action.deleteRequest)
 	if err != nil {
 		return structs.NewErrorReplyHeaderWithErr(err,
 			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
 	}
 
-	err = utils.DeleteObjectById(env, "parameters", action.deleteRequest.ObjectId, "DeleteParameterAction")
-	if err != nil {
-		return structs.NewErrorReplyHeaderWithErr(err,
+	orionErr := action.deleteObject(ctx, action.deleteRequest.ObjectId)
+	if orionErr != nil {
+		return structs.NewErrorReplyHeaderWithOrionErr(orionErr,
 			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
 	}
 
@@ -146,13 +147,31 @@ func (action *DeleteParameterAction) HeyHo(ctx context.Context, request []byte) 
 	return reply, &action.deleteRequest
 }
 
-func (action *DeleteParameterAction) getNameBeforeDelete(objectId int64) error {
-	query := "SELECT name FROM parameters WHERE id=$1"
-	var name string
-	row := action.GetBaseAction().Environment.Database.QueryRow(query, objectId)
-	err := row.Scan(&name)
+func (action *DeleteParameterAction) deleteObject(ctx context.Context, id string) *structs.OrionError {
+	newCtx := context.WithValue(ctx, "id", id)
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		callbackId := fmt.Sprintf("%v", newCtx.Value("id"))
+		result, err := mongodb.DeleteAndFindOneById(sessCtx, action.baseAction.Environment.MongoDbConnection, "parameters", callbackId)
+		if err != nil {
+			return nil, err
+		}
+		var objectToArchive structs2.Parameter
+		err = result.Decode(&objectToArchive)
+		if err != nil {
+			return nil, err
+		}
+		objectToArchive.Info.DeletionDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+			Int64: utils2.GetCurrentTimeStamp(),
+			Valid: true,
+		}}
+		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "parameters", objectToArchive)
 
-	action.objectName = name
+		return nil, nil
+	}
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
+	if err != nil {
+		return structs.NewOrionError(structs.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
+	}
 
-	return err
+	return nil
 }

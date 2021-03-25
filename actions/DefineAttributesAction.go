@@ -4,17 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	laniakea "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	"github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/lib/pq"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	structs2 "orion.misc/structs"
 	"time"
@@ -24,6 +26,7 @@ type DefineAttributesAction struct {
 	baseAction   micro.BaseAction
 	MetricsStore *utils.MetricsStore
 	savedObjects []structs.AttributeDefinition
+	startedTime  int64
 }
 
 func (action DefineAttributesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -68,7 +71,7 @@ func (action DefineAttributesAction) SendEvents(request micro.IRequest) {
 			action.GetBaseAction().Environment,
 			true).Warn("Events won't be sent because the request was not successfully executed")
 		blerghEvent := structs.NewRequestFailedEvent(saveRequest, action.ProvideInformation(), action.baseAction.ID.String(), "")
-		blerghEvent.Send(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.publishEventQos")),
+		_ = blerghEvent.Send(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.publishEventQos")),
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
@@ -90,7 +93,7 @@ func (action DefineAttributesAction) SendEvents(request micro.IRequest) {
 
 func (action DefineAttributesAction) ProvideInformation() micro.ActionInformation {
 	var reply = "orion/server/misc/reply/attributedefinition/save"
-	var error = "orion/server/misc/error/attributedefinition/save"
+	var errorSubject = "orion/server/misc/error/attributedefinition/save"
 	var event = "orion/server/misc/event/attributedefinition/save"
 	var requestSample = dataStructures.StructToJsonString(structs2.DefineAttributeRequest{})
 	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
@@ -99,7 +102,7 @@ func (action DefineAttributesAction) ProvideInformation() micro.ActionInformatio
 		Description:    "Saves AttributeDefinition and all necessary references to the database",
 		RequestPath:    "orion/server/misc/request/attributedefinition/save",
 		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
+		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: errorSubject, Valid: true}},
 		Version:        1,
 		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.GetBaseAction().ID.String(), Valid: true}},
 		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
@@ -120,6 +123,7 @@ func (action *DefineAttributesAction) HandleWebRequest(writer http.ResponseWrite
 func (action *DefineAttributesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
+	action.startedTime = laniakea.GetCurrentTimeStamp()
 
 	saveRequest := structs2.DefineAttributeRequest{}
 
@@ -129,13 +133,12 @@ func (action *DefineAttributesAction) HeyHo(ctx context.Context, request []byte)
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
-	err = action.saveObjects(saveRequest.UpdatedAttributeDefinitions, saveRequest.OriginalAttributeDefintions, saveRequest.Header.User)
-	if err != nil {
-		//fmt.Printf("Save Users error: %v\n", err)
+	orionErr := action.saveObjects(ctx, saveRequest.UpdatedAttributeDefinitions, saveRequest.Header.Comment, saveRequest.Header.User)
+	if orionErr != nil {
 		logging.GetLogger("DefineAttributesAction",
 			action.GetBaseAction().Environment,
-			true).WithError(err).Error("Data could not be saved")
-		return structs.NewErrorReplyHeaderWithOrionErr(structs.NewOrionError(structs.DatabaseError, err),
+			true).WithError(orionErr.Error).Error("Data could not be saved")
+		return structs.NewErrorReplyHeaderWithOrionErr(orionErr,
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
@@ -145,7 +148,72 @@ func (action *DefineAttributesAction) HeyHo(ctx context.Context, request []byte)
 	return reply, &saveRequest
 }
 
-func (action *DefineAttributesAction) saveObjects(updatedObjects []structs.AttributeDefinition, originalObjects []structs.AttributeDefinition, user string) error {
+func (action *DefineAttributesAction) archiveAndReplaceObject(ctx context.Context, object structs.AttributeDefinition) error {
+	var objectToArchive structs.AttributeDefinition
+	result, err := mongodb.ReplaceAndFindOneById(ctx, action.baseAction.Environment.MongoDbConnection, "attribute_definitions", object.ID.Hex(), object)
+	if err != nil {
+		return err
+	}
+	err = result.Decode(&objectToArchive)
+	if err != nil {
+		return err
+	}
+	objectToArchive.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+		Int64: action.startedTime,
+		Valid: true,
+	}}
+	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "attribute_definitions", objectToArchive)
+
+	return err
+}
+
+func (action *DefineAttributesAction) saveObjects(ctx context.Context, updatedObjects []structs.AttributeDefinition, comment, user string) *structs.OrionError {
+	newCtx := context.WithValue(ctx, "objects", updatedObjects)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		objects := sessCtx.Value("objects").([]structs.AttributeDefinition)
+		for _, object := range objects {
+			if object.Info.CreatedDate == 0 {
+				object.Info.CreatedDate = laniakea.GetCurrentTimeStamp()
+			}
+			if object.ID == nil || object.ID.IsZero() {
+				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "attribute_definitions", object)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				object.Info.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: comment,
+					Valid:  true,
+				}}
+				object.Info.User = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: user,
+					Valid:  true,
+				}}
+				object.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+					Int64: action.startedTime,
+					Valid: true,
+				}}
+
+				err := action.archiveAndReplaceObject(sessCtx, object)
+				if err != nil {
+					return nil, err
+				}
+			}
+			action.savedObjects = append(action.savedObjects, object)
+		}
+
+		return nil, nil
+	}
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
+	if err != nil {
+		return structs.NewOrionError(structs.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
+	}
+
+	return nil
+}
+
+/*func (action *DefineAttributesAction) saveObjects(updatedObjects []structs.AttributeDefinition, originalObjects []structs.AttributeDefinition, user string) error {
 	insertSql := "INSERT INTO attributes (name, description, active, action_by, pretty_id, datatype, " +
 		" overwriteable, allowed_object_types, list_of_values, numeric_from, numeric_to, " +
 		" query, object_type, default_value, assign_during_object_creation) " +
@@ -193,4 +261,4 @@ func (action *DefineAttributesAction) saveObjects(updatedObjects []structs.Attri
 	}
 
 	return txn.Commit()
-}
+}*/

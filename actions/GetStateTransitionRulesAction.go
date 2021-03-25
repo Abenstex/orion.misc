@@ -5,25 +5,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
-	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/lib/pq"
-	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"net/http"
 	"orion.misc/structs"
 	"time"
 )
-
-const SqlGetAllStateTransitionRules = "SELECT id, name, description, active, " +
-	"(extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, " +
-	"from_state, to_states, version FROM state_transition_rules"
 
 type GetStateTransitionRulesAction struct {
 	baseAction      micro.BaseAction
@@ -98,7 +91,7 @@ func (action *GetStateTransitionRulesAction) HandleWebRequest(writer http.Respon
 	http2.HandleHttpRequest(writer, request, action)
 }
 
-func (action GetStateTransitionRulesAction) createGetStateTransitionRulesReply(objects []structs.StateTransitionRule) (structs.GetStateTransitionRulesReply, *micro.Exception) {
+func (action GetStateTransitionRulesAction) createGetStateTransitionRulesReply(objects []structs.StateTransitionRule) (structs.GetStateTransitionRulesReply, *structs2.OrionError) {
 	var reply = structs.GetStateTransitionRulesReply{}
 	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
@@ -113,7 +106,7 @@ func (action GetStateTransitionRulesAction) createGetStateTransitionRulesReply(o
 
 	err := errors.New(errorMsg)
 
-	return reply, micro.NewException(structs2.NoDataFound, err)
+	return reply, structs2.NewOrionError(structs2.NoDataFound, err)
 }
 
 func (action GetStateTransitionRulesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
@@ -126,39 +119,17 @@ func (action GetStateTransitionRulesAction) HeyHo(ctx context.Context, request [
 			action.ProvideInformation().ErrorReplyPath.String), &action.receivedRequest
 	}
 
-	reply, myErr := action.getStateTransitionRules(action.receivedRequest)
+	reply, myErr := action.getStateTransitionRules(ctx, action.receivedRequest)
 	if myErr != nil {
-		return structs2.NewErrorReplyHeaderWithException(myErr,
+		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
 			action.ProvideInformation().ErrorReplyPath.String), &action.receivedRequest
 	}
 
 	return reply, &action.receivedRequest
 }
 
-func (action GetStateTransitionRulesAction) fillStateTransitionRules(rows *sql.Rows) ([]structs.StateTransitionRule, *micro.Exception) {
-	var objects []structs.StateTransitionRule
-
-	for rows.Next() {
-		var object structs.StateTransitionRule
-		/*
-			id, name, description, active, " +
-			"(extract(epoch from created_date)::bigint)*1000 AS created_date, pretty_id, " +
-			"from_state, to_states, version
-		*/
-		err := rows.Scan(&object.Info.Id, &object.Info.Name, &object.Info.Description, &object.Info.Active,
-			&object.Info.CreatedDate, &object.Info.Alias, &object.FromState, pq.Array(&object.ToStates), &object.Info.Version)
-		if err != nil {
-			return nil, micro.NewException(structs2.DatabaseError, err)
-		}
-
-		objects = append(objects, object)
-	}
-	//fmt.Sprintf("Size of objects: %d", len(objects))
-	return objects, nil
-}
-
-func (action GetStateTransitionRulesAction) getStateTransitionRules(request structs.GetStateTransitionRulesRequest) (structs.GetStateTransitionRulesReply, *micro.Exception) {
-	objects, myErr := action.getStateTransitionRulesFromDb(request)
+func (action GetStateTransitionRulesAction) getStateTransitionRules(ctx context.Context, request structs.GetStateTransitionRulesRequest) (structs.GetStateTransitionRulesReply, *structs2.OrionError) {
+	objects, myErr := action.getStateTransitionRulesFromDb(ctx, request)
 
 	if myErr != nil {
 		return structs.GetStateTransitionRulesReply{}, myErr
@@ -167,30 +138,15 @@ func (action GetStateTransitionRulesAction) getStateTransitionRules(request stru
 	return action.createGetStateTransitionRulesReply(objects)
 }
 
-func (action GetStateTransitionRulesAction) getStateTransitionRulesFromDb(request structs.GetStateTransitionRulesRequest) ([]structs.StateTransitionRule, *micro.Exception) {
-	var sql = SqlGetAllStateTransitionRules
-
-	if request.WhereClause != nil && len(*request.WhereClause) > 1 {
-		sql += " WHERE " + *request.WhereClause
-	}
-	logger := logging.GetLogger("GetStateTransitionRulesAction", action.GetBaseAction().Environment, false)
-	logger.WithFields(logrus.Fields{
-		"query": sql,
-	}).Debug("Issuing GetStateTransitionRulesAction query")
-
-	rows, err := action.GetBaseAction().Environment.Database.Query(sql)
+func (action GetStateTransitionRulesAction) getStateTransitionRulesFromDb(ctx context.Context, request structs.GetStateTransitionRulesRequest) ([]structs.StateTransitionRule, *structs2.OrionError) {
+	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("attribute_definitions").Find(ctx, bson.M{})
 	if err != nil {
-		return nil, micro.NewException(structs2.DatabaseError, err)
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	defer rows.Close()
-	objects, myErr := action.fillStateTransitionRules(rows)
-	if myErr != nil {
-		return objects, myErr
+	var objects []structs.StateTransitionRule
+	if err = cursor.All(ctx, &objects); err != nil {
+		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}
-	err = rows.Err()
-	if err != nil {
-		fmt.Errorf("error code: %v - %v", structs2.DatabaseError, err)
-		return nil, micro.NewException(structs2.DatabaseError, err)
-	}
+
 	return objects, nil
 }

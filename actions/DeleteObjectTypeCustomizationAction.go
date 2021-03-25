@@ -4,16 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	"github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
+	structs2 "orion.misc/structs"
 	"time"
 )
 
@@ -120,20 +124,15 @@ func (action *DeleteObjectTypeCustomizationAction) HeyHo(ctx context.Context, re
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
-	env := action.GetBaseAction().Environment
 	err := json.Unmarshal(request, &action.deleteRequest)
 	if err != nil {
 		return structs.NewErrorReplyHeaderWithException(micro.NewException(structs.UnmarshalError, err),
 			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
 	}
 
-	err = utils.DeleteObjectById(env, "object_type_customizations", action.deleteRequest.ObjectId, "DeleteObjectTypeCustomizationAction")
-	if err != nil {
-		logging.GetLogger("DeleteObjectTypeCustomizationAction", action.baseAction.Environment, true).
-			WithError(err).
-			Error("object with id %v could not be deleted from the database", action.deleteRequest.ObjectId)
-
-		return structs.NewErrorReplyHeaderWithException(micro.NewException(structs.DatabaseError, err),
+	orionErr := action.deleteObject(ctx, action.deleteRequest.ObjectId)
+	if orionErr != nil {
+		return structs.NewErrorReplyHeaderWithOrionErr(orionErr,
 			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
 	}
 
@@ -141,4 +140,30 @@ func (action *DeleteObjectTypeCustomizationAction) HeyHo(ctx context.Context, re
 	reply.Success = true
 
 	return reply, &action.deleteRequest
+}
+
+func (action *DeleteObjectTypeCustomizationAction) deleteObject(ctx context.Context, id string) *structs.OrionError {
+	newCtx := context.WithValue(ctx, "id", id)
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		callbackId := fmt.Sprintf("%v", newCtx.Value("id"))
+		result, err := mongodb.DeleteAndFindOneById(sessCtx, action.baseAction.Environment.MongoDbConnection, "object_type_customizations", callbackId)
+		if err != nil {
+			return nil, err
+		}
+		var objectToArchive structs2.ObjectTypeCustomization
+		err = result.Decode(&objectToArchive)
+		if err != nil {
+			return nil, err
+		}
+		// ToDo Delete references in other objects
+		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "object_type_customizations", objectToArchive)
+
+		return nil, nil
+	}
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
+	if err != nil {
+		return structs.NewOrionError(structs.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
+	}
+
+	return nil
 }

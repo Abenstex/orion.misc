@@ -9,13 +9,14 @@ import (
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
 	"github.com/abenstex/laniakea/utils"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	app2 "github.com/abenstex/orion.commons/app"
-	"github.com/abenstex/orion.commons/couchdb"
+	"github.com/abenstex/orion.commons/historicize"
 	"github.com/abenstex/orion.commons/http"
 	common_utils "github.com/abenstex/orion.commons/utils"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -59,6 +60,7 @@ func (app *MiscApp) Init(configPath string) (utils.Environment, error) {
 	var topic = viper.GetString("messagebus.baseTopic")
 	var errorTopic = viper.GetString("messagebus.baseErrorTopic")
 	var info []micro.ActionInformation
+	id := primitive.NewObjectID()
 
 	app.AppInfo = micro.MicroServiceApplicationInformation{
 		HostAddress:       utils.GetLocalIP(),
@@ -73,6 +75,7 @@ func (app *MiscApp) Init(configPath string) (utils.Environment, error) {
 		ActionInformation: info,
 		Company:           dataStructures.JsonNullString{NullString: sql.NullString{String: "Blackhole Software", Valid: true}},
 		Port:              viper.GetInt("http.port"),
+		ID:                &id,
 	}
 
 	app.Environment = environment
@@ -88,7 +91,7 @@ func (app *MiscApp) historicize(action micro.Action, receivedTime int64, request
 			if requestError != nil {
 				success = false
 			}
-			err := couchdb.HistoricizeRequestReplyFromString(requestPayload, success, requestError,
+			err := historicize.HistoricizeRequestReplyFromString(requestPayload, success, requestError,
 				action.ProvideInformation().RequestPath, "BUS", receivedTime)
 			if err != nil {
 				logger := logging.GetLogger(ApplicationName, app.Environment, true)

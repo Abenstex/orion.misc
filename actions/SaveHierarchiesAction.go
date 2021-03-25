@@ -8,25 +8,25 @@ import (
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	"orion.misc/structs"
-	"strings"
 	"time"
 )
 
 type SaveHierarchiesAction struct {
-	baseAction       micro.BaseAction
-	MetricsStore     *utils.MetricsStore
-	savedHierarchies []structs.Hierarchy
-	receivedTime     int64
+	baseAction   micro.BaseAction
+	MetricsStore *utils.MetricsStore
+	savedObjects []structs.Hierarchy
+	startedTime  int64
 }
 
 func (action SaveHierarchiesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -76,13 +76,10 @@ func (action SaveHierarchiesAction) SendEvents(request micro.IRequest) {
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
-	ids := make([]int64, 0, len(saveRequest.UpdatedHierarchies))
-	for _, hierarchy := range saveRequest.UpdatedHierarchies {
-		ids = append(ids, hierarchy.Info.Id)
-	}
+
 	event := structs.SavedHierarchiesEvent{
 		Header:      *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
-		Hierarchies: action.savedHierarchies,
+		Hierarchies: action.savedObjects,
 		ObjectType:  "HIERARCHY",
 	}
 
@@ -132,7 +129,7 @@ func (action *SaveHierarchiesAction) HeyHo(ctx context.Context, request []byte) 
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
 
 	saveRequest := structs.SaveHierarchiesRequest{}
-	action.receivedTime = utils2.GetCurrentTimeStamp()
+	action.startedTime = utils2.GetCurrentTimeStamp()
 
 	err := json.Unmarshal(request, &saveRequest)
 	if err != nil {
@@ -141,12 +138,12 @@ func (action *SaveHierarchiesAction) HeyHo(ctx context.Context, request []byte) 
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
-	exception := action.saveHierarchies(saveRequest.UpdatedHierarchies, saveRequest.Header.User)
+	exception := action.saveObjects(ctx, saveRequest.UpdatedHierarchies, saveRequest.Header.Comment, saveRequest.Header.User)
 	if exception != nil {
 		logging.GetLogger(action.ProvideInformation().Name,
 			action.GetBaseAction().Environment,
 			true).WithField("exception", exception).Error("Data could not be saved")
-		return structs2.NewErrorReplyHeaderWithException(exception,
+		return structs2.NewErrorReplyHeaderWithOrionErr(exception,
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
@@ -156,92 +153,66 @@ func (action *SaveHierarchiesAction) HeyHo(ctx context.Context, request []byte) 
 	return reply, &saveRequest
 }
 
-func (action *SaveHierarchiesAction) saveHierarchies(updatedHierarchies []structs.Hierarchy, user string) *micro.Exception {
-	// INSERT INTO hierarchies (id, name, description, active, action_by, created_date, pretty_id, action_date, object_type, service, index, hierarchy_object_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-	insertSql := "INSERT INTO hierarchies (name, description, active, action_by, " +
-		"pretty_id, object_type) " +
-		"VALUES ($1, $2, $3, $4, $5, $6) RETURNING id"
-
-	action.savedHierarchies = make([]structs.Hierarchy, len(updatedHierarchies), len(updatedHierarchies))
-
-	txn, err := action.GetBaseAction().Environment.Database.Begin()
+func (action *SaveHierarchiesAction) archiveAndReplaceObject(ctx context.Context, object structs.Hierarchy) error {
+	var objectToArchive structs.Hierarchy
+	result, err := mongodb.ReplaceAndFindOneById(ctx, action.baseAction.Environment.MongoDbConnection, "hierarchies", object.ID.Hex(), object)
 	if err != nil {
-		if txn != nil {
-			txn.Rollback()
-		}
-		return micro.NewException(structs2.DatabaseError, err)
+		return err
 	}
-	ids := make([]int64, len(updatedHierarchies), len(updatedHierarchies))
+	err = result.Decode(&objectToArchive)
+	if err != nil {
+		return err
+	}
+	objectToArchive.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+		Int64: action.startedTime,
+		Valid: true,
+	}}
+	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "hierarchies", objectToArchive)
 
-	for idx, hierarchy := range updatedHierarchies {
-		var id int64
-		if hierarchy.Info.Id > 0 {
-			fmt.Printf("Deleting hierarchy refs with id: %v\n", hierarchy.Info.Id)
-			/*err = utils.DeleteObjectByIdWithTransaction(txn, "ref_hierarchies_types", hierarchy.Info.Id)
-			if err != nil {
-				txn.Rollback()
-				return micro.NewException(structs2.DatabaseError, err)
-			}*/
-		} else {
-			err = utils2.ExecuteInsertWithTransactionWithAutoId(txn, insertSql, &id, hierarchy.Info.Name,
-				hierarchy.Info.Description, hierarchy.Info.Active, user, hierarchy.Info.Alias, "HIERARCHY")
-			if err != nil {
-				txn.Rollback()
-				return micro.NewException(structs2.DatabaseError, err)
+	return err
+}
+
+func (action *SaveHierarchiesAction) saveObjects(ctx context.Context, objects []structs.Hierarchy, comment, user string) *structs2.OrionError {
+	newCtx := context.WithValue(ctx, "objects", objects)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		objects := sessCtx.Value("objects").([]structs.Hierarchy)
+		for _, object := range objects {
+			if object.Info.CreatedDate == 0 {
+				object.Info.CreatedDate = utils2.GetCurrentTimeStamp()
 			}
-			hierarchy.Info.Id = id
+			if object.ID == nil || object.ID.IsZero() {
+				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "hierarchies", object)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				object.Info.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: comment,
+					Valid:  true,
+				}}
+				object.Info.User = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: user,
+					Valid:  true,
+				}}
+				object.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+					Int64: action.startedTime,
+					Valid: true,
+				}}
+
+				err := action.archiveAndReplaceObject(sessCtx, object)
+				if err != nil {
+					return nil, err
+				}
+			}
+			action.savedObjects = append(action.savedObjects, object)
 		}
-		exception := action.saveReferences(hierarchy, txn, user)
-		if exception != nil {
-			txn.Rollback()
-			return exception
-		}
-		ids[idx] = hierarchy.Info.Id
-		action.savedHierarchies[idx] = hierarchy
+
+		return nil, nil
 	}
-
-	err = txn.Commit()
-
-	exception := action.deleteLeftovers(ids)
-	if exception != nil {
-		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).
-			WithFields(logrus.Fields{"exception": exception, "ids": ids}).
-			Error("could not delete data from ref_hierarchies_types")
-	}
-
-	return micro.NewException(structs2.DatabaseError, err)
-}
-
-func (action *SaveHierarchiesAction) deleteLeftovers(ids []int64) *micro.Exception {
-	delQuery := "DELETE FROM ref_hierarchies_types WHERE hierarchy_id=$1 " +
-		"AND (change_date IS NULL OR change_date < to_timestamp($2) )"
-	for _, id := range ids {
-		fmt.Printf("Executing query: %v for id %v and received time %v\n", delQuery, id, action.receivedTime/1000)
-		err := utils2.ExecuteQueryInTransaction(action.baseAction.Environment, delQuery, id, action.receivedTime/1000)
-		if err != nil {
-			return micro.NewException(structs2.DatabaseError, err)
-		}
-	}
-
-	return nil
-}
-
-func (action *SaveHierarchiesAction) saveReferences(hierarchy structs.Hierarchy, tx *sql.Tx, user string) *micro.Exception {
-	insertSqlRef := "INSERT INTO ref_hierarchies_types (hierarchy_id, index, object_type, action_by, change_date) " +
-		"VALUES ($1, $2, $3, $4, to_timestamp($5)) " +
-		"ON CONFLICT ON CONSTRAINT ref_hierarchies_types_unique_constraint " +
-		"DO UPDATE SET index = $6, action_by = $7, change_date=to_timestamp($8) "
-
-	//fmt.Printf("Received time: %v\n", action.receivedTime)
-
-	for _, entry := range hierarchy.Entries {
-		err := utils2.ExecuteQueryWithTransaction(tx, insertSqlRef, hierarchy.Info.Id,
-			entry.Index, strings.TrimSpace(entry.ObjectType), user, action.receivedTime/1000,
-			entry.Index, user, action.receivedTime/1000)
-		if err != nil {
-			tx.Rollback()
-			return micro.NewException(structs2.DatabaseError, err)
-		}
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
+	if err != nil {
+		return structs2.NewOrionError(structs2.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
 	}
 
 	return nil

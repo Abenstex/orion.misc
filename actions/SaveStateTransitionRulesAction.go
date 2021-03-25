@@ -4,17 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/laniakea/logging"
 	"github.com/abenstex/laniakea/micro"
+	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	utils2 "github.com/abenstex/laniakea/utils"
 	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
-	"github.com/lib/pq"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	"orion.misc/structs"
 	"time"
@@ -24,6 +26,7 @@ type SaveStateTransitionRulesAction struct {
 	baseAction                micro.BaseAction
 	MetricsStore              *utils.MetricsStore
 	savedStateTransitionRules []structs.StateTransitionRule
+	startedTime               int64
 }
 
 func (action SaveStateTransitionRulesAction) BeforeAction(ctx context.Context, request []byte) *micro.Exception {
@@ -72,10 +75,7 @@ func (action SaveStateTransitionRulesAction) SendEvents(request micro.IRequest) 
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
-	ids := make([]int64, 0, len(saveRequest.UpdatedStateTransitionRules))
-	for _, state := range saveRequest.UpdatedStateTransitionRules {
-		ids = append(ids, state.Info.Id)
-	}
+
 	event := structs.SavedStateTransitionRulesEvent{
 		Header:               *micro.NewEventHeaderForAction(action.ProvideInformation(), saveRequest.Header.SenderId, ""),
 		StateTransitionRules: action.savedStateTransitionRules,
@@ -124,6 +124,7 @@ func (action *SaveStateTransitionRulesAction) HandleWebRequest(writer http.Respo
 func (action *SaveStateTransitionRulesAction) HeyHo(ctx context.Context, request []byte) (micro.IReply, micro.IRequest) {
 	start := time.Now()
 	defer action.MetricsStore.HandleActionMetric(start, action.GetBaseAction().Environment, action.ProvideInformation(), *action.baseAction.Token)
+	action.startedTime = utils2.GetCurrentTimeStamp()
 
 	saveRequest := structs.SaveStateTransitionRulesRequest{}
 
@@ -135,12 +136,12 @@ func (action *SaveStateTransitionRulesAction) HeyHo(ctx context.Context, request
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
-	err = action.saveStateTransitionRules(saveRequest.UpdatedStateTransitionRules, saveRequest.Header.User)
-	if err != nil {
+	orionErr := action.saveObjects(ctx, saveRequest.UpdatedStateTransitionRules, saveRequest.Header.Comment, saveRequest.Header.User)
+	if orionErr != nil {
 		logging.GetLogger(action.ProvideInformation().Name,
 			action.GetBaseAction().Environment,
 			true).WithError(err).Error("Data could not be saved")
-		return structs2.NewErrorReplyHeaderWithOrionErr(structs2.NewOrionError(structs2.DatabaseError, err),
+		return structs2.NewErrorReplyHeaderWithOrionErr(orionErr,
 			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
 	}
 
@@ -150,42 +151,67 @@ func (action *SaveStateTransitionRulesAction) HeyHo(ctx context.Context, request
 	return reply, &saveRequest
 }
 
-func (action *SaveStateTransitionRulesAction) saveStateTransitionRules(updatedRules []structs.StateTransitionRule, user string) error {
-	updateSql := "UPDATE state_transition_rules SET name = $1, description = $2, active = $3, action_by = $4, " +
-		"pretty_id = $5, from_state = $6, to_states = $7 WHERE id = $8 "
-
-	action.savedStateTransitionRules = make([]structs.StateTransitionRule, len(updatedRules), len(updatedRules))
-
-	txn, err := action.GetBaseAction().Environment.Database.Begin()
+func (action *SaveStateTransitionRulesAction) archiveAndReplaceObject(ctx context.Context, object structs.StateTransitionRule) error {
+	var objectToArchive structs.StateTransitionRule
+	result, err := mongodb.ReplaceAndFindOneById(ctx, action.baseAction.Environment.MongoDbConnection, "state_transition_rules", object.ID.Hex(), object)
 	if err != nil {
-		if txn != nil {
-			txn.Rollback()
-		}
 		return err
 	}
-
-	insertColumns := []string{"name", "description", "active", "action_by", "pretty_id", "object_type", "from_state", "to_states"}
-
-	for idx, rule := range updatedRules {
-		if rule.Info.Id >= 0 {
-			err := utils2.ExecuteQueryWithTransaction(txn, updateSql, rule.Info.Name,
-				rule.Info.Description, rule.Info.Active, user, rule.Info.Alias, rule.FromState, pq.Array(rule.ToStates), rule.Info.Id)
-			if err != nil {
-				txn.Rollback()
-				return err
-			}
-		} else {
-			err = utils2.ExecuteInsertWithTransaction(txn, "state_transition_rules", insertColumns, rule.Info.Name, rule.Info.Description,
-				rule.Info.Active, user, rule.Info.Alias, "STATE_TRANSITION_RULE", rule.FromState, pq.Array(rule.ToStates))
-			if err != nil {
-				txn.Rollback()
-				return err
-			}
-		}
-		action.savedStateTransitionRules[idx] = rule
+	err = result.Decode(&objectToArchive)
+	if err != nil {
+		return err
 	}
+	objectToArchive.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+		Int64: action.startedTime,
+		Valid: true,
+	}}
+	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "state_transition_rules", objectToArchive)
 
-	return txn.Commit()
+	return err
+}
+
+func (action *SaveStateTransitionRulesAction) saveObjects(ctx context.Context, objects []structs.StateTransitionRule, comment, user string) *structs2.OrionError {
+	newCtx := context.WithValue(ctx, "objects", objects)
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		objects := sessCtx.Value("objects").([]structs.StateTransitionRule)
+		for _, object := range objects {
+			if object.Info.CreatedDate == 0 {
+				object.Info.CreatedDate = utils2.GetCurrentTimeStamp()
+			}
+			if object.ID == nil || object.ID.IsZero() {
+				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "state_transition_rules", object)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				object.Info.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: comment,
+					Valid:  true,
+				}}
+				object.Info.User = dataStructures.JsonNullString{NullString: sql.NullString{
+					String: user,
+					Valid:  true,
+				}}
+				object.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
+					Int64: action.startedTime,
+					Valid: true,
+				}}
+
+				err := action.archiveAndReplaceObject(sessCtx, object)
+				if err != nil {
+					return nil, err
+				}
+			}
+			action.savedStateTransitionRules = append(action.savedStateTransitionRules, object)
+		}
+
+		return nil, nil
+	}
+	_, err := mongodb.PerformQueriesInTransaction(newCtx, action.baseAction.Environment.MongoDbConnection, callback)
+	if err != nil {
+		return structs2.NewOrionError(structs2.DatabaseError, fmt.Errorf("error executing queries in transaction: %v", err))
+	}
 
 	return nil
 }
