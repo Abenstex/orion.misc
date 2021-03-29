@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -71,7 +70,7 @@ func (action DeleteAttributeDefinitionAction) SendEvents(request micro.IRequest)
 			action.GetBaseAction().Environment,
 			true).Warn("RequestFailedEvent will be sent because the request was not successfully executed")
 		blerghEvent := structs.NewRequestFailedEvent(delRequest, action.ProvideInformation(), action.baseAction.ID.String(), "")
-		blerghEvent.Send(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.publishEventQos")),
+		blerghEvent.Send(action.ProvideInformation().ErrorReplyTopic, byte(viper.GetInt("messageBus.publishEventQos")),
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
@@ -88,7 +87,7 @@ func (action DeleteAttributeDefinitionAction) SendEvents(request micro.IRequest)
 
 		return
 	}
-	mqtt.Publish(action.ProvideInformation().EventTopic.String, jsonString, byte(viper.GetInt("messageBus.publishEventQos")), utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
+	mqtt.Publish(action.ProvideInformation().EventTopic, jsonString, byte(viper.GetInt("messageBus.publishEventQos")), utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 }
 
 func (action DeleteAttributeDefinitionAction) ProvideInformation() micro.ActionInformation {
@@ -98,18 +97,18 @@ func (action DeleteAttributeDefinitionAction) ProvideInformation() micro.ActionI
 	var requestSample = dataStructures.StructToJsonString(structs.DeleteRequest{})
 	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
 	info := micro.ActionInformation{
-		Name:           "DeleteAttributeDefinitionAction",
-		Description:    "Delete an attribute definition from the database",
-		RequestPath:    "orion/server/misc/request/attributedefinition/delete",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: errorSubject, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.GetBaseAction().ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		EventTopic:     dataStructures.JsonNullString{NullString: sql.NullString{String: event, Valid: true}},
-		IsScriptable:   false,
+		Name:            "DeleteAttributeDefinitionAction",
+		Description:     "Delete an attribute definition from the database",
+		RequestTopic:    "orion/server/misc/request/attributedefinition/delete",
+		ReplyTopic:      reply,
+		ErrorReplyTopic: errorSubject,
+		Version:         1,
+		ClientId:        action.GetBaseAction().ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		EventTopic:      event,
+		IsScriptable:    false,
 	}
 
 	return info
@@ -127,7 +126,7 @@ func (action *DeleteAttributeDefinitionAction) HeyHo(ctx context.Context, reques
 	err := json.Unmarshal(request, &action.deleteRequest)
 	if err != nil {
 		return structs.NewErrorReplyHeaderWithException(micro.NewException(structs.UnmarshalError, err),
-			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
+			action.ProvideInformation().ErrorReplyTopic), &action.deleteRequest
 	}
 
 	//err = utils.DeleteObjectById(env, "attributes", action.deleteRequest.ObjectId, "DeleteAttributeDefinitionAction")
@@ -138,10 +137,10 @@ func (action *DeleteAttributeDefinitionAction) HeyHo(ctx context.Context, reques
 			Error("object with id %v could not be deleted from the database", action.deleteRequest.ObjectId)
 
 		return structs.NewErrorReplyHeaderWithOrionErr(orionErr,
-			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
+			action.ProvideInformation().ErrorReplyTopic), &action.deleteRequest
 	}
 
-	reply := structs.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
+	reply := structs.NewReplyHeader(action.ProvideInformation().ReplyTopic)
 	reply.Success = true
 
 	return reply, &action.deleteRequest
@@ -160,10 +159,8 @@ func (action *DeleteAttributeDefinitionAction) deleteObject(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
-		objectToArchive.Info.DeletionDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
-			Int64: utils2.GetCurrentTimeStamp(),
-			Valid: true,
-		}}
+		time := utils2.GetCurrentTimeStamp()
+		objectToArchive.Info.DeletionDate = &time
 		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "attribute_definitions", objectToArchive)
 
 		return nil, nil

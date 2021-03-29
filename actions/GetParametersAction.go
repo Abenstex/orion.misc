@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -68,17 +67,17 @@ func (action GetParametersAction) ProvideInformation() micro.ActionInformation {
 	var requestSample = dataStructures.StructToJsonString(structs.GetParametersRequest{})
 	var replySample = dataStructures.StructToJsonString(structs.GetParametersReply{})
 	info := micro.ActionInformation{
-		Name:           "GetParametersAction",
-		Description:    "Get attribute definitions based on conditions or all if no conditions were sent in the request",
-		RequestPath:    "orion/server/misc/request/parameter/get",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.baseAction.ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		IsScriptable:   false,
+		Name:            "GetParametersAction",
+		Description:     "Get attribute definitions based on conditions or all if no conditions were sent in the request",
+		RequestTopic:    "orion/server/misc/request/parameter/get",
+		ReplyTopic:      reply,
+		ErrorReplyTopic: error,
+		Version:         1,
+		ClientId:        action.baseAction.ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		IsScriptable:    false,
 	}
 
 	return info
@@ -91,7 +90,7 @@ func (action *GetParametersAction) HandleWebRequest(writer http.ResponseWriter, 
 
 func (action GetParametersAction) createGetParametersReply(parameters []structs.Parameter) (structs.GetParametersReply, *structs2.OrionError) {
 	var reply = structs.GetParametersReply{}
-	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
+	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyTopic)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
 	if len(parameters) > 0 {
 		reply.Header.Success = true
@@ -116,13 +115,13 @@ func (action GetParametersAction) HeyHo(ctx context.Context, request []byte) (mi
 	err := json.Unmarshal(request, &receivedRequest)
 	if err != nil {
 		return structs2.NewErrorReplyHeaderWithException(micro.NewException(structs2.UnmarshalError, err),
-			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
+			action.ProvideInformation().ErrorReplyTopic), &receivedRequest
 	}
 
 	reply, myErr := action.getParameters(ctx, receivedRequest)
 	if myErr != nil {
 		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
-			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
+			action.ProvideInformation().ErrorReplyTopic), &receivedRequest
 	}
 
 	return reply, &receivedRequest

@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -70,17 +69,17 @@ func (action GetStateTransitionRulesAction) ProvideInformation() micro.ActionInf
 	var requestSample = dataStructures.StructToJsonString(structs.GetStateTransitionRulesRequest{})
 	var replySample = dataStructures.StructToJsonString(structs.GetStateTransitionRulesReply{})
 	info := micro.ActionInformation{
-		Name:           "GetStateTransitionRulesAction",
-		Description:    "Gets all state transition rules from the database",
-		RequestPath:    "orion/server/misc/request/statetransitionrule/get",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.baseAction.ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		IsScriptable:   false,
+		Name:            "GetStateTransitionRulesAction",
+		Description:     "Gets all state transition rules from the database",
+		RequestTopic:    "orion/server/misc/request/statetransitionrule/get",
+		ReplyTopic:      reply,
+		ErrorReplyTopic: error,
+		Version:         1,
+		ClientId:        action.baseAction.ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		IsScriptable:    false,
 	}
 
 	return info
@@ -93,7 +92,7 @@ func (action *GetStateTransitionRulesAction) HandleWebRequest(writer http.Respon
 
 func (action GetStateTransitionRulesAction) createGetStateTransitionRulesReply(objects []structs.StateTransitionRule) (structs.GetStateTransitionRulesReply, *structs2.OrionError) {
 	var reply = structs.GetStateTransitionRulesReply{}
-	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
+	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyTopic)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
 	if len(objects) > 0 {
 		reply.Header.Success = true
@@ -116,13 +115,13 @@ func (action GetStateTransitionRulesAction) HeyHo(ctx context.Context, request [
 	err := json.Unmarshal(request, &action.receivedRequest)
 	if err != nil {
 		return structs2.NewErrorReplyHeaderWithException(micro.NewException(structs2.UnmarshalError, err),
-			action.ProvideInformation().ErrorReplyPath.String), &action.receivedRequest
+			action.ProvideInformation().ErrorReplyTopic), &action.receivedRequest
 	}
 
 	reply, myErr := action.getStateTransitionRules(ctx, action.receivedRequest)
 	if myErr != nil {
 		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
-			action.ProvideInformation().ErrorReplyPath.String), &action.receivedRequest
+			action.ProvideInformation().ErrorReplyTopic), &action.receivedRequest
 	}
 
 	return reply, &action.receivedRequest

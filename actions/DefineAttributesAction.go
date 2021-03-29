@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -71,7 +70,7 @@ func (action DefineAttributesAction) SendEvents(request micro.IRequest) {
 			action.GetBaseAction().Environment,
 			true).Warn("Events won't be sent because the request was not successfully executed")
 		blerghEvent := structs.NewRequestFailedEvent(saveRequest, action.ProvideInformation(), action.baseAction.ID.String(), "")
-		_ = blerghEvent.Send(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.publishEventQos")),
+		_ = blerghEvent.Send(action.ProvideInformation().ErrorReplyTopic, byte(viper.GetInt("messageBus.publishEventQos")),
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
@@ -87,7 +86,7 @@ func (action DefineAttributesAction) SendEvents(request micro.IRequest) {
 
 		return
 	}
-	mqtt.Publish(action.ProvideInformation().EventTopic.String, json, byte(viper.GetInt("messageBus.publishEventQos")),
+	mqtt.Publish(action.ProvideInformation().EventTopic, json, byte(viper.GetInt("messageBus.publishEventQos")),
 		utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 }
 
@@ -98,18 +97,18 @@ func (action DefineAttributesAction) ProvideInformation() micro.ActionInformatio
 	var requestSample = dataStructures.StructToJsonString(structs2.DefineAttributeRequest{})
 	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
 	info := micro.ActionInformation{
-		Name:           "DefineAttributesAction",
-		Description:    "Saves AttributeDefinition and all necessary references to the database",
-		RequestPath:    "orion/server/misc/request/attributedefinition/save",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: errorSubject, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.GetBaseAction().ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		EventTopic:     dataStructures.JsonNullString{NullString: sql.NullString{String: event, Valid: true}},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		IsScriptable:   false,
+		Name:            "DefineAttributesAction",
+		Description:     "Saves AttributeDefinition and all necessary references to the database",
+		RequestTopic:    "orion/server/misc/request/attributedefinition/save",
+		ReplyTopic:      reply,
+		ErrorReplyTopic: errorSubject,
+		Version:         1,
+		ClientId:        action.GetBaseAction().ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		EventTopic:      event,
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		IsScriptable:    false,
 	}
 
 	return info
@@ -130,7 +129,7 @@ func (action *DefineAttributesAction) HeyHo(ctx context.Context, request []byte)
 	err := json.Unmarshal(request, &saveRequest)
 	if err != nil {
 		return structs.NewErrorReplyHeaderWithOrionErr(structs.NewOrionError(structs.UnmarshalError, err),
-			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
+			action.ProvideInformation().ErrorReplyTopic), &saveRequest
 	}
 
 	orionErr := action.saveObjects(ctx, saveRequest.UpdatedAttributeDefinitions, saveRequest.Header.Comment, saveRequest.Header.User)
@@ -139,10 +138,10 @@ func (action *DefineAttributesAction) HeyHo(ctx context.Context, request []byte)
 			action.GetBaseAction().Environment,
 			true).WithError(orionErr.Error).Error("Data could not be saved")
 		return structs.NewErrorReplyHeaderWithOrionErr(orionErr,
-			action.ProvideInformation().ErrorReplyPath.String), &saveRequest
+			action.ProvideInformation().ErrorReplyTopic), &saveRequest
 	}
 
-	reply := structs.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
+	reply := structs.NewReplyHeader(action.ProvideInformation().ReplyTopic)
 	reply.Success = true
 
 	return reply, &saveRequest
@@ -158,10 +157,7 @@ func (action *DefineAttributesAction) archiveAndReplaceObject(ctx context.Contex
 	if err != nil {
 		return err
 	}
-	objectToArchive.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
-		Int64: action.startedTime,
-		Valid: true,
-	}}
+	objectToArchive.Info.ChangeDate = &action.startedTime
 	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "attribute_definitions", objectToArchive)
 
 	return err
@@ -182,18 +178,9 @@ func (action *DefineAttributesAction) saveObjects(ctx context.Context, updatedOb
 					return nil, err
 				}
 			} else {
-				object.Info.UserComment = dataStructures.JsonNullString{NullString: sql.NullString{
-					String: comment,
-					Valid:  true,
-				}}
-				object.Info.User = dataStructures.JsonNullString{NullString: sql.NullString{
-					String: user,
-					Valid:  true,
-				}}
-				object.Info.ChangeDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
-					Int64: action.startedTime,
-					Valid: true,
-				}}
+				object.Info.UserComment = &comment
+				object.Info.User = &user
+				object.Info.ChangeDate = &action.startedTime
 
 				err := action.archiveAndReplaceObject(sessCtx, object)
 				if err != nil {

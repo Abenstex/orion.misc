@@ -23,8 +23,8 @@ func (request *SaveStatesRequest) HandleResult(reply micro.IReply) micro.IReques
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -56,8 +56,8 @@ func (request *GetStatesRequest) HandleResult(reply micro.IReply) micro.IRequest
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -85,8 +85,8 @@ func (request *SaveStateTransitionRulesRequest) HandleResult(reply micro.IReply)
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -116,8 +116,8 @@ func (request *DefineAttributeRequest) HandleResult(reply micro.IReply) micro.IR
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -149,8 +149,8 @@ func (request *GetAttributeDefinitionsRequest) HandleResult(reply micro.IReply) 
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -180,8 +180,8 @@ func (request *SetAttributeValueRequest) HandleResult(reply micro.IReply) micro.
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -212,8 +212,8 @@ func (request *DeleteAttributeValueRequest) HandleResult(reply micro.IReply) mic
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -244,8 +244,8 @@ func (request *GetAttributeValuesRequest) HandleResult(reply micro.IReply) micro
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -275,8 +275,8 @@ func (request *GetAttributeValueChangeHistoryRequest) HandleResult(reply micro.I
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -304,8 +304,8 @@ func (request *SaveHierarchiesRequest) HandleResult(reply micro.IReply) micro.IR
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -337,8 +337,8 @@ func (request *GetHierarchiesRequest) HandleResult(reply micro.IReply) micro.IRe
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -369,8 +369,8 @@ func (request *EvaluateAttributeRequest) HandleResult(reply micro.IReply) micro.
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -398,8 +398,8 @@ func (request *SaveParametersRequest) HandleResult(reply micro.IReply) micro.IRe
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -431,8 +431,8 @@ func (request *GetParametersRequest) HandleResult(reply micro.IReply) micro.IReq
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -462,8 +462,8 @@ func (request *GetModuleReadmesRequest) HandleResult(reply micro.IReply) micro.I
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -491,8 +491,8 @@ func (request *SaveCategoriesRequest) HandleResult(reply micro.IReply) micro.IRe
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -524,8 +524,8 @@ func (request *GetCategoriesRequest) HandleResult(reply micro.IReply) micro.IReq
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -555,8 +555,8 @@ func (request *GetObjectsPerCategoriesRequest) HandleResult(reply micro.IReply) 
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -586,8 +586,8 @@ func (request *SaveObjectTypeCustomizationsRequest) HandleResult(reply micro.IRe
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -617,8 +617,8 @@ func (request *GetObjectTypeCustomizationsRequest) HandleResult(reply micro.IRep
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 
@@ -648,8 +648,8 @@ func (request *GetStateTransitionRulesRequest) HandleResult(reply micro.IReply) 
 	header := request.Header
 	header.WasExecutedSuccessfully = reply.Successful()
 	if len(reply.Error()) > 0 {
-		error := reply.Error()
-		header.ExecutionError = &error
+		err := reply.Error()
+		header.ExecutionError = &err
 	}
 	request.Header = header
 

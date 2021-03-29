@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -82,17 +81,17 @@ func (action EvaluateAttributeAction) ProvideInformation() micro.ActionInformati
 	var requestSample = dataStructures.StructToJsonString(structs.EvaluateAttributeRequest{})
 	var replySample = dataStructures.StructToJsonString(structs.EvaluateAttributeReply{})
 	info := micro.ActionInformation{
-		Name:           "EvaluateAttributeAction",
-		Description:    "Evaluates attributes for an object using possible hierarchies if setup",
-		RequestPath:    "orion/server/misc/request/attribute/evaluate",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.baseAction.ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		IsScriptable:   true,
+		Name:            "EvaluateAttributeAction",
+		Description:     "Evaluates attributes for an object using possible hierarchies if setup",
+		RequestTopic:    "orion/server/misc/request/attribute/evaluate",
+		ReplyTopic:      reply,
+		ErrorReplyTopic: error,
+		Version:         1,
+		ClientId:        action.baseAction.ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		IsScriptable:    true,
 	}
 
 	return info

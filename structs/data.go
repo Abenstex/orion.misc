@@ -1,7 +1,6 @@
 package structs
 
 import (
-	"github.com/abenstex/laniakea/dataStructures"
 	"github.com/abenstex/orion.commons/structs"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -53,15 +52,15 @@ type Category struct {
 }
 
 type ObjectTypeCustomization struct {
-	ID                *primitive.ObjectID           `bson:"_id,omitempty" json:"_id,omitempty"`
-	ObjectType        string                        `bson:"object_type" json:"object_type"`
-	FieldName         string                        `bson:"field_name" json:"field_name"`
-	FielDataType      string                        `bson:"field_data_type" json:"field_data_type"`
-	FieldMandatory    bool                          `bson:"is_mandatory_field" json:"is_mandatory_field"`
-	FieldDefaultValue dataStructures.JsonNullString `bson:"field_default_value" json:"field_default_value"`
-	CreatedDate       int64                         `bson:"created_date" json:"created_date"`
-	CreatedBy         dataStructures.JsonNullString `bson:"created_by" json:"created_by"`
-	UserComment       dataStructures.JsonNullString `bson:"user_comment" json:"user_comment"`
-	User              dataStructures.JsonNullString `bson:"user" json:"user"`
-	ChangeDate        dataStructures.JsonNullInt64  `bson:"change_date" json:"change_date"`
+	ID                *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	ObjectType        string              `bson:"object_type" json:"object_type"`
+	FieldName         string              `bson:"field_name" json:"field_name"`
+	FielDataType      string              `bson:"field_data_type" json:"field_data_type"`
+	FieldMandatory    bool                `bson:"is_mandatory_field" json:"is_mandatory_field"`
+	FieldDefaultValue *string             `bson:"field_default_value" json:"field_default_value"`
+	CreatedDate       int64               `bson:"created_date" json:"created_date"`
+	CreatedBy         *string             `bson:"created_by" json:"created_by"`
+	UserComment       *string             `bson:"user_comment" json:"user_comment"`
+	User              *string             `bson:"user" json:"user"`
+	ChangeDate        *int64              `bson:"change_date" json:"change_date"`
 }

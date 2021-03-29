@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -68,17 +67,17 @@ func (action GetAttributeDefinitionsAction) ProvideInformation() micro.ActionInf
 	var requestSample = dataStructures.StructToJsonString(structs.GetAttributeDefinitionsRequest{})
 	var replySample = dataStructures.StructToJsonString(structs.GetAttributeDefinitionsReply{})
 	info := micro.ActionInformation{
-		Name:           "GetAttributeDefinitionsAction",
-		Description:    "Get attribute definitions based on conditions or all if no conditions were sent in the request",
-		RequestPath:    "orion/server/misc/request/attributedefinition/get",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: errorTopic, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.baseAction.ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		IsScriptable:   false,
+		Name:            "GetAttributeDefinitionsAction",
+		Description:     "Get attribute definitions based on conditions or all if no conditions were sent in the request",
+		RequestTopic:    "orion/server/misc/request/attributedefinition/get",
+		ReplyTopic:      reply,
+		ErrorReplyTopic: errorTopic,
+		Version:         1,
+		ClientId:        action.baseAction.ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		IsScriptable:    false,
 	}
 
 	return info
@@ -91,7 +90,7 @@ func (action *GetAttributeDefinitionsAction) HandleWebRequest(writer http.Respon
 
 func (action GetAttributeDefinitionsAction) createGetAttributeDefinitionsReply(definitions []structs2.AttributeDefinition) (structs.GetAttributeDefinitionsReply, *structs2.OrionError) {
 	var reply = structs.GetAttributeDefinitionsReply{}
-	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
+	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyTopic)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
 	if len(definitions) > 0 {
 		reply.Header.Success = true
@@ -116,13 +115,13 @@ func (action GetAttributeDefinitionsAction) HeyHo(ctx context.Context, request [
 	err := json.Unmarshal(request, &receivedRequest)
 	if err != nil {
 		return structs2.NewErrorReplyHeaderWithException(micro.NewException(structs2.UnmarshalError, err),
-			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
+			action.ProvideInformation().ErrorReplyTopic), &receivedRequest
 	}
 
 	reply, myErr := action.getAttributeDefinitions(ctx, receivedRequest)
 	if myErr != nil {
 		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
-			action.ProvideInformation().ErrorReplyPath.String), &receivedRequest
+			action.ProvideInformation().ErrorReplyTopic), &receivedRequest
 	}
 
 	return reply, &receivedRequest

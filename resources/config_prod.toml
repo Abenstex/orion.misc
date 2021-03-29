@@ -8,6 +8,25 @@ dbname = "orion"
 maxIdleConnections = 10
 maxOpenConnections = 10
 
+
+[mongodb]
+host = "orion.keprc.mongodb.net"
+user = "orion"
+password = "orion"
+database = "orion"
+
+[mongodb_archive]
+host = "orion.keprc.mongodb.net"
+user = "orion"
+password = "orion"
+database = "orion_history"
+
+[mongodb_logging]
+host = "orion.keprc.mongodb.net"
+user = "orion"
+password = "orion"
+database = "orion_history"
+
 [couchdb]
 host = "192.168.2.43"
 user = "orion"

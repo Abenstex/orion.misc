@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -71,17 +70,17 @@ func (action GetObjectTypeCustomizationsAction) ProvideInformation() micro.Actio
 	var requestSample = dataStructures.StructToJsonString(structs.GetCategoriesRequest{})
 	var replySample = dataStructures.StructToJsonString(structs.GetCategoriesReply{})
 	info := micro.ActionInformation{
-		Name:           "GetObjectTypeCustomizationsAction",
-		Description:    "Get object type customizations based on conditions or all if no conditions were sent in the request",
-		RequestPath:    "orion/server/misc/request/objectcustomization/get",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.baseAction.ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		IsScriptable:   false,
+		Name:            "GetObjectTypeCustomizationsAction",
+		Description:     "Get object type customizations based on conditions or all if no conditions were sent in the request",
+		RequestTopic:    "orion/server/misc/request/objectcustomization/get",
+		ReplyTopic:      reply,
+		ErrorReplyTopic: error,
+		Version:         1,
+		ClientId:        action.baseAction.ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		IsScriptable:    false,
 	}
 
 	return info
@@ -94,7 +93,7 @@ func (action *GetObjectTypeCustomizationsAction) HandleWebRequest(writer http.Re
 
 func (action GetObjectTypeCustomizationsAction) createGetObjectTypeCustomizationsReply(customizations []structs.ObjectTypeCustomization) (structs.GetObjectTypeCustomizationsReply, *structs2.OrionError) {
 	var reply = structs.GetObjectTypeCustomizationsReply{}
-	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
+	reply.Header = structs2.NewReplyHeader(action.ProvideInformation().ReplyTopic)
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
 	if len(customizations) > 0 {
 		reply.Header.Success = true
@@ -117,7 +116,7 @@ func (action GetObjectTypeCustomizationsAction) HeyHo(ctx context.Context, reque
 	reply, myErr := action.getCustomizations(ctx, action.request)
 	if myErr != nil {
 		return structs2.NewErrorReplyHeaderWithOrionErr(myErr,
-			action.ProvideInformation().ErrorReplyPath.String), &action.request
+			action.ProvideInformation().ErrorReplyTopic), &action.request
 	}
 
 	return reply, &action.request

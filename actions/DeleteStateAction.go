@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/abenstex/laniakea/dataStructures"
@@ -74,7 +73,7 @@ func (action DeleteStateAction) SendEvents(request micro.IRequest) {
 			action.GetBaseAction().Environment,
 			true).Warn("RequestFailedEvent will be sent because the request was not successfully executed")
 		blerghEvent := structs.NewRequestFailedEvent(delRequest, action.ProvideInformation(), action.baseAction.ID.String(), "")
-		blerghEvent.Send(action.ProvideInformation().ErrorReplyPath.String, byte(viper.GetInt("messageBus.publishEventQos")),
+		blerghEvent.Send(action.ProvideInformation().ErrorReplyTopic, byte(viper.GetInt("messageBus.publishEventQos")),
 			utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 		return
 	}
@@ -91,30 +90,27 @@ func (action DeleteStateAction) SendEvents(request micro.IRequest) {
 
 		return
 	}
-	mqtt.Publish(action.ProvideInformation().EventTopic.String, json, byte(viper.GetInt("messageBus.publishEventQos")), utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
+	mqtt.Publish(action.ProvideInformation().EventTopic, json, byte(viper.GetInt("messageBus.publishEventQos")), utils.GetDefaultMqttConnectionOptionsWithIdPrefix(action.ProvideInformation().Name))
 }
 
 func (action DeleteStateAction) ProvideInformation() micro.ActionInformation {
-	var reply = "orion/server/misc/reply/state/delete"
-	var error = "orion/server/misc/error/state/delete"
-	var event = "orion/server/misc/event/state/delete"
 	var requestSample = dataStructures.StructToJsonString(structs.DeleteRequest{})
 	var replySample = dataStructures.StructToJsonString(micro.ReplyHeader{})
 	var eventSample = dataStructures.StructToJsonString(structs.DeletedEvent{})
 	info := micro.ActionInformation{
-		Name:           "DeleteStateAction",
-		Description:    "Delete a state from the database",
-		RequestPath:    "orion/server/misc/request/state/delete",
-		ReplyPath:      dataStructures.JsonNullString{NullString: sql.NullString{String: reply, Valid: true}},
-		ErrorReplyPath: dataStructures.JsonNullString{NullString: sql.NullString{String: error, Valid: true}},
-		Version:        1,
-		ClientId:       dataStructures.JsonNullString{NullString: sql.NullString{String: action.GetBaseAction().ID.String(), Valid: true}},
-		HttpMethods:    []string{http.MethodPost, "OPTIONS"},
-		RequestSample:  dataStructures.JsonNullString{NullString: sql.NullString{String: requestSample, Valid: true}},
-		ReplySample:    dataStructures.JsonNullString{NullString: sql.NullString{String: replySample, Valid: true}},
-		EventTopic:     dataStructures.JsonNullString{NullString: sql.NullString{String: event, Valid: true}},
-		EventSample:    dataStructures.JsonNullString{NullString: sql.NullString{String: eventSample, Valid: true}},
-		IsScriptable:   false,
+		Name:            "DeleteStateAction",
+		Description:     "Delete a state from the database",
+		RequestTopic:    "orion/server/misc/request/state/delete",
+		ReplyTopic:      "orion/server/misc/reply/state/delete",
+		ErrorReplyTopic: "orion/server/misc/error/state/delete",
+		Version:         1,
+		ClientId:        action.GetBaseAction().ID.String(),
+		HttpMethods:     []string{http.MethodPost, "OPTIONS"},
+		RequestSample:   &requestSample,
+		ReplySample:     &replySample,
+		EventTopic:      "orion/server/misc/event/state/delete",
+		EventSample:     &eventSample,
+		IsScriptable:    false,
 	}
 
 	return info
@@ -132,16 +128,16 @@ func (action *DeleteStateAction) HeyHo(ctx context.Context, request []byte) (mic
 	err := json.Unmarshal(request, &action.deleteRequest)
 	if err != nil {
 		return structs.NewErrorReplyHeaderWithErr(err,
-			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
+			action.ProvideInformation().ErrorReplyTopic), &action.deleteRequest
 	}
 
 	orionErr := action.deleteObject(ctx, action.deleteRequest.ObjectId)
 	if orionErr != nil {
 		return structs.NewErrorReplyHeaderWithOrionErr(orionErr,
-			action.ProvideInformation().ErrorReplyPath.String), &action.deleteRequest
+			action.ProvideInformation().ErrorReplyTopic), &action.deleteRequest
 	}
 
-	reply := structs.NewReplyHeader(action.ProvideInformation().ReplyPath.String)
+	reply := structs.NewReplyHeader(action.ProvideInformation().ReplyTopic)
 	reply.Success = true
 
 	return reply, &action.deleteRequest
@@ -160,10 +156,9 @@ func (action *DeleteStateAction) deleteObject(ctx context.Context, id string) *s
 		if err != nil {
 			return nil, err
 		}
-		objectToArchive.Info.DeletionDate = dataStructures.JsonNullInt64{NullInt64: sql.NullInt64{
-			Int64: utils2.GetCurrentTimeStamp(),
-			Valid: true,
-		}}
+		time := utils2.GetCurrentTimeStamp()
+		objectToArchive.Info.DeletionDate = &time
+
 		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "states", objectToArchive)
 
 		return nil, nil
