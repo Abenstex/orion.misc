@@ -159,6 +159,7 @@ func (action *SaveObjectTypeCustomizationAction) archiveAndReplaceObject(ctx con
 		return err
 	}
 	objectToArchive.ChangeDate = &action.startedTime
+	objectToArchive.ID = nil
 	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "object_type_customization", objectToArchive)
 
 	return err

@@ -155,6 +155,7 @@ func (action *DeleteObjectTypeCustomizationAction) deleteObject(ctx context.Cont
 			return nil, err
 		}
 		// ToDo Delete references in other objects
+		objectToArchive.ID = nil
 		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "object_type_customizations", objectToArchive)
 
 		return nil, nil

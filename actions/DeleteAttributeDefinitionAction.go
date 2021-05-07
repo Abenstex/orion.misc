@@ -161,6 +161,7 @@ func (action *DeleteAttributeDefinitionAction) deleteObject(ctx context.Context,
 		}
 		time := utils2.GetCurrentTimeStamp()
 		objectToArchive.Info.DeletionDate = &time
+		objectToArchive.ID = nil
 		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "attribute_definitions", objectToArchive)
 
 		return nil, nil

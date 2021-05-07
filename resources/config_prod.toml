@@ -1,5 +1,6 @@
 title = "ORION.Misc Config"
 [database]
+useSql = false
 host = "rengstlcloud.spdns.de"
 port = 5432
 user = "orion"

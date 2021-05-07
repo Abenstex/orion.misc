@@ -6,7 +6,7 @@ set GOPATH=C:\Users\chris\go
 set serverAddress=192.168.2.42
 set moduleName=orion.misc
 set rootPath=/home/chrisu/orion/releases
-set releaseVersion=0.2.1
+set releaseVersion=0.2.2
 set osArch=arm
 
 echo 'Building ' %moduleName%

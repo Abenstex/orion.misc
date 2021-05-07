@@ -159,6 +159,7 @@ func (action *SaveCategoriesAction) archiveAndReplaceObject(ctx context.Context,
 		return err
 	}
 	objectToArchive.Info.ChangeDate = &action.startedTime
+	objectToArchive.ID = nil
 	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "categories", objectToArchive)
 
 	return err

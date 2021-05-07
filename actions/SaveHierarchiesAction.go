@@ -163,6 +163,7 @@ func (action *SaveHierarchiesAction) archiveAndReplaceObject(ctx context.Context
 		return err
 	}
 	objectToArchive.Info.ChangeDate = &action.startedTime
+	objectToArchive.ID = nil
 	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "hierarchies", objectToArchive)
 
 	return err

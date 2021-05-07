@@ -3,8 +3,8 @@ module orion.misc
 go 1.15
 
 require (
-	github.com/abenstex/laniakea v0.2.16
-	github.com/abenstex/orion.commons v0.2.19
+	github.com/abenstex/laniakea v0.2.18
+	github.com/abenstex/orion.commons v0.2.24
 	github.com/eclipse/paho.mqtt.golang v1.2.0
 	github.com/lib/pq v1.7.0
 	//github.com/eclipse/paho.mqtt.golang v1.2.0

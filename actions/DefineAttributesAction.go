@@ -158,6 +158,7 @@ func (action *DefineAttributesAction) archiveAndReplaceObject(ctx context.Contex
 		return err
 	}
 	objectToArchive.Info.ChangeDate = &action.startedTime
+	objectToArchive.ID = nil
 	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "attribute_definitions", objectToArchive)
 
 	return err

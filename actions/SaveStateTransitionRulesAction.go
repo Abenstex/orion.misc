@@ -161,6 +161,7 @@ func (action *SaveStateTransitionRulesAction) archiveAndReplaceObject(ctx contex
 		return err
 	}
 	objectToArchive.Info.ChangeDate = &action.startedTime
+	objectToArchive.ID = nil
 	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "state_transition_rules", objectToArchive)
 
 	return err

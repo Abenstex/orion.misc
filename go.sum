@@ -18,10 +18,15 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/abenstex/laniakea v0.2.16 h1:kRpCmkaAQufLNbfuF5AlJzOkD1+6a8oL5cyNBcBLvIM=
 github.com/abenstex/laniakea v0.2.16/go.mod h1:r3221L3x2YTdH++jtc5oG5McXNwC+3YRjwBWuewmj1g=
+github.com/abenstex/laniakea v0.2.17/go.mod h1:r3221L3x2YTdH++jtc5oG5McXNwC+3YRjwBWuewmj1g=
+github.com/abenstex/laniakea v0.2.18 h1:0OyQoOPQ89OqMFt1Z9NuOtXTKMSsj1gDBArCpeFyoy4=
+github.com/abenstex/laniakea v0.2.18/go.mod h1:r3221L3x2YTdH++jtc5oG5McXNwC+3YRjwBWuewmj1g=
 github.com/abenstex/orion.commons v0.2.18 h1:0LC60glV25jeGT2Ifq5bvpcNHVWR/VwrwuL1dkv18g0=
 github.com/abenstex/orion.commons v0.2.18/go.mod h1:eFlEOsEQTREnORIIkEsw6r9QSPCNxw+Ry5AFL2RUMYo=
 github.com/abenstex/orion.commons v0.2.19 h1:aZ8tOvN+1TRPz+u6mUhaPHlIak58gzKJqZbx1jbL5pE=
 github.com/abenstex/orion.commons v0.2.19/go.mod h1:eFlEOsEQTREnORIIkEsw6r9QSPCNxw+Ry5AFL2RUMYo=
+github.com/abenstex/orion.commons v0.2.24 h1:MPnmhnrogSTFfWgls0yx3giAkt695HeC03Hxn2gp81E=
+github.com/abenstex/orion.commons v0.2.24/go.mod h1:0l/HDE/GTlXMuMBvQZV5gWDrYRoiO8npBLmckf3uS+4=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=

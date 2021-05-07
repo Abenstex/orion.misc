@@ -158,6 +158,7 @@ func (action *DeleteStateAction) deleteObject(ctx context.Context, id string) *s
 		}
 		time := utils2.GetCurrentTimeStamp()
 		objectToArchive.Info.DeletionDate = &time
+		objectToArchive.ID = nil
 
 		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "states", objectToArchive)
 

@@ -22,7 +22,7 @@ import (
 )
 
 const ApplicationName = "ORION.Misc"
-const ApplicationVersion = "0.2.0"
+const ApplicationVersion = "0.2.2"
 const HeartbeatTopic = "orion/server/heartbeat/misc"
 
 type MiscApp struct {
@@ -183,7 +183,10 @@ func (app *MiscApp) StopApplication() error {
 	logger.Debug("Stopping " + ApplicationName + " " + ApplicationVersion)
 	//utils.StopCommunication()
 
-	return app.Environment.Database.Close()
+	if viper.GetBool("database.useSql") == true {
+		return app.Environment.Database.Close()
+	}
+	return nil
 }
 
 func (app *MiscApp) RegisterApplication() error {

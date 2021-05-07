@@ -161,6 +161,7 @@ func (action *DeleteCategoryAction) deleteObject(ctx context.Context, id string)
 		}
 		time := utils2.GetCurrentTimeStamp()
 		objectToArchive.Info.DeletionDate = &time
+		objectToArchive.ID = nil
 		_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "categories", objectToArchive)
 
 		return nil, nil

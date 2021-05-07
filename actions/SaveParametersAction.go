@@ -163,6 +163,7 @@ func (action *SaveParametersAction) archiveAndReplaceObject(ctx context.Context,
 		return err
 	}
 	objectToArchive.Info.ChangeDate = &action.startedTime
+	objectToArchive.ID = nil
 	_, err = mongodb.InsertOne(context.Background(), action.baseAction.Environment.MongoDbArchiveConnection, "parameters", objectToArchive)
 
 	return err
