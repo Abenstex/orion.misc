@@ -35,8 +35,11 @@ func (action SaveStateTransitionRulesAction) BeforeAction(ctx context.Context, r
 		return micro.NewException(structs2.UnmarshalError, err)
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	return nil
 }
 
 func (action SaveStateTransitionRulesAction) BeforeActionAsync(ctx context.Context, request []byte) {
@@ -169,12 +172,17 @@ func (action *SaveStateTransitionRulesAction) archiveAndReplaceObject(ctx contex
 
 func (action *SaveStateTransitionRulesAction) saveObjects(ctx context.Context, objects []structs.StateTransitionRule, comment, user string) *structs2.OrionError {
 	newCtx := context.WithValue(ctx, "objects", objects)
-
+	objType := "STATE_TRANSITION_RULE"
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		objects := sessCtx.Value("objects").([]structs.StateTransitionRule)
 		for _, object := range objects {
+			object.Info.UserComment = &comment
+			object.Info.User = &user
 			if object.Info.CreatedDate == 0 {
 				object.Info.CreatedDate = utils2.GetCurrentTimeStamp()
+			}
+			if object.Info.ObjectType == nil {
+				object.Info.ObjectType = &objType
 			}
 			if object.ID == nil || object.ID.IsZero() {
 				_, err := mongodb.InsertOne(sessCtx, action.baseAction.Environment.MongoDbConnection, "state_transition_rules", object)
@@ -182,8 +190,6 @@ func (action *SaveStateTransitionRulesAction) saveObjects(ctx context.Context, o
 					return nil, err
 				}
 			} else {
-				object.Info.UserComment = &comment
-				object.Info.User = &user
 				object.Info.ChangeDate = &action.startedTime
 
 				err := action.archiveAndReplaceObject(sessCtx, object)

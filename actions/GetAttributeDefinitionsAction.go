@@ -30,7 +30,11 @@ func (action GetAttributeDefinitionsAction) BeforeAction(ctx context.Context, re
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
+
+	return nil
 }
 
 func (action GetAttributeDefinitionsAction) BeforeActionAsync(ctx context.Context, request []byte) {

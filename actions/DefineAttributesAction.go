@@ -10,7 +10,6 @@ import (
 	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	laniakea "github.com/abenstex/laniakea/utils"
-	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	"github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
@@ -34,9 +33,11 @@ func (action DefineAttributesAction) BeforeAction(ctx context.Context, request [
 	if err != nil {
 		return micro.NewException(structs.UnmarshalError, err)
 	}
-	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+	if err != nil {
+		return micro.NewException(structs.RequestHeaderInvalid, err)
+	}
 
-	return micro.NewException(structs.RequestHeaderInvalid, err)
+	return nil
 }
 
 func (action DefineAttributesAction) BeforeActionAsync(ctx context.Context, request []byte) {

@@ -39,7 +39,11 @@ func (action *SaveCategoriesAction) BeforeAction(ctx context.Context, request []
 
 	action.saveRequest = dummy
 
-	return micro.NewException(structs.RequestHeaderInvalid, err)
+	if err != nil {
+		return micro.NewException(structs.RequestHeaderInvalid, err)
+	}
+
+	return nil
 }
 
 func (action SaveCategoriesAction) BeforeActionAsync(ctx context.Context, request []byte) {

@@ -30,7 +30,11 @@ func (action GetStatesAction) BeforeAction(ctx context.Context, request []byte) 
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
+
+	return nil
 }
 
 func (action GetStatesAction) BeforeActionAsync(ctx context.Context, request []byte) {
@@ -98,7 +102,7 @@ func (action GetStatesAction) createGetStatesReply(states []structs2.State) (str
 	reply.Header.Timestamp = utils2.GetCurrentTimeStamp()
 	if len(states) > 0 {
 		reply.Header.Success = true
-		reply.States = states
+		reply.Data = states
 		return reply, nil
 	}
 	reply.Header.Success = false

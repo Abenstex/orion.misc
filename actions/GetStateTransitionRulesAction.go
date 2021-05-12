@@ -32,7 +32,11 @@ func (action *GetStateTransitionRulesAction) BeforeAction(ctx context.Context, r
 	action.receivedRequest = dummy
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, action, true)
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
+
+	return nil
 }
 
 func (action GetStateTransitionRulesAction) BeforeActionAsync(ctx context.Context, request []byte) {
@@ -138,7 +142,7 @@ func (action GetStateTransitionRulesAction) getStateTransitionRules(ctx context.
 }
 
 func (action GetStateTransitionRulesAction) getStateTransitionRulesFromDb(ctx context.Context, request structs.GetStateTransitionRulesRequest) ([]structs.StateTransitionRule, *structs2.OrionError) {
-	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("attribute_definitions").Find(ctx, bson.M{})
+	cursor, err := action.baseAction.Environment.MongoDbConnection.Database().Collection("state_transition_rules").Find(ctx, bson.M{})
 	if err != nil {
 		return nil, structs2.NewOrionError(structs2.DatabaseError, err)
 	}

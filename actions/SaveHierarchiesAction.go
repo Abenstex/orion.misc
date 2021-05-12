@@ -10,7 +10,6 @@ import (
 	"github.com/abenstex/laniakea/mongodb"
 	"github.com/abenstex/laniakea/mqtt"
 	utils2 "github.com/abenstex/laniakea/utils"
-	"github.com/abenstex/orion.commons/app"
 	http2 "github.com/abenstex/orion.commons/http"
 	structs2 "github.com/abenstex/orion.commons/structs"
 	"github.com/abenstex/orion.commons/utils"
@@ -35,9 +34,11 @@ func (action SaveHierarchiesAction) BeforeAction(ctx context.Context, request []
 		logging.GetLogger(action.ProvideInformation().Name, action.baseAction.Environment, true).WithError(err).Errorf("error unmarshalling the request: %v\n", string(request))
 		return micro.NewException(structs2.UnmarshalError, err)
 	}
-	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	return nil
 }
 
 func (action SaveHierarchiesAction) BeforeActionAsync(ctx context.Context, request []byte) {

@@ -37,8 +37,11 @@ func (action *SaveObjectTypeCustomizationAction) BeforeAction(ctx context.Contex
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, action, true)
 	action.saveRequest = dummy
+	if err != nil {
+		return micro.NewException(structs.RequestHeaderInvalid, err)
+	}
 
-	return micro.NewException(structs.RequestHeaderInvalid, err)
+	return nil
 }
 
 func (action SaveObjectTypeCustomizationAction) BeforeActionAsync(ctx context.Context, request []byte) {

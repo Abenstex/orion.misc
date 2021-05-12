@@ -33,7 +33,11 @@ func (action GetCategoriesAction) BeforeAction(ctx context.Context, request []by
 
 	action.request = dummy
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
+
+	return nil
 }
 
 func (action GetCategoriesAction) BeforeActionAsync(ctx context.Context, request []byte) {

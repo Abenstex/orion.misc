@@ -36,7 +36,11 @@ func (action SaveParametersAction) BeforeAction(ctx context.Context, request []b
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
 
-	return micro.NewException(structs.RequestHeaderInvalid, err)
+	if err != nil {
+		return micro.NewException(structs.RequestHeaderInvalid, err)
+	}
+
+	return nil
 }
 
 func (action SaveParametersAction) BeforeActionAsync(ctx context.Context, request []byte) {

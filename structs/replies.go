@@ -8,7 +8,7 @@ import (
 
 type GetStatesReply struct {
 	Header micro.ReplyHeader `json:"header"`
-	States []structs.State   `json:"states"`
+	Data   []structs.State   `json:"data"`
 }
 
 func (reply GetStatesReply) MarshalJSON() (string, error) {

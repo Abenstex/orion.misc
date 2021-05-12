@@ -32,8 +32,11 @@ func (action GetObjectTypeCustomizationsAction) BeforeAction(ctx context.Context
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
 
 	action.request = dummy
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	return nil
 }
 
 func (action GetObjectTypeCustomizationsAction) BeforeActionAsync(ctx context.Context, request []byte) {

@@ -36,8 +36,11 @@ func (action SaveStatesAction) BeforeAction(ctx context.Context, request []byte)
 		return micro.NewException(structs2.UnmarshalError, err)
 	}
 	err = app.DefaultHandleActionRequest(request, &dummy.Header, &action, true)
+	if err != nil {
+		return micro.NewException(structs2.RequestHeaderInvalid, err)
+	}
 
-	return micro.NewException(structs2.RequestHeaderInvalid, err)
+	return nil
 }
 
 func (action SaveStatesAction) BeforeActionAsync(ctx context.Context, request []byte) {
@@ -173,6 +176,8 @@ func (action *SaveStatesAction) saveObjects(ctx context.Context, objects []struc
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		objects := sessCtx.Value("objects").([]structs2.State)
 		for _, object := range objects {
+			object.Info.UserComment = &comment
+			object.Info.User = &user
 			if object.Info.CreatedDate == 0 {
 				object.Info.CreatedDate = utils2.GetCurrentTimeStamp()
 			}
@@ -182,8 +187,7 @@ func (action *SaveStatesAction) saveObjects(ctx context.Context, objects []struc
 					return nil, err
 				}
 			} else {
-				object.Info.UserComment = &comment
-				object.Info.User = &user
+
 				object.Info.ChangeDate = &action.startedTime
 
 				err := action.archiveAndReplaceObject(sessCtx, object)

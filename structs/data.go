@@ -6,10 +6,10 @@ import (
 )
 
 type StateTransitionRule struct {
-	ID        *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
-	Info      structs.BaseInfo    `bson:"info" json:"info"`
-	FromState int64               `bson:"from_state" json:"from_state"`
-	ToStates  []int64             `bson:"to_states" json:"to_states"`
+	ID                  *primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Info                structs.BaseInfo    `bson:"info" json:"info"`
+	SourceState         string              `bson:"source_state" json:"source_state"`
+	AllowedTargetStates []string            `bson:"allowed_target_states" json:"allowed_target_states"`
 }
 
 type AttributeChange struct {
